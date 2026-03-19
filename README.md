@@ -10,9 +10,9 @@ El método divide el ingreso quincenal en tres fondos con propósitos distintos:
 
 | Bolsillo | Propósito | Ingreso quincenal |
 |---|---|---|
-| **Bolsillo 1 — Día a día** | Gastos operativos: transporte, comida, salud, obligaciones | $727.041 COP |
-| **Bolsillo 2 — Gastos personales** | Ocio, salidas, restaurantes, compras, regalos | $436.225 COP |
-| **Bolsillo 3 — Ahorro / Emergencias** | Intocable salvo emergencia real · 10.5% E.A. | $290.086 COP |
+| **Bolsillo 1 — Día a día** | Gastos operativos: transporte, comida, salud, obligaciones | $xxx COP |
+| **Bolsillo 2 — Gastos personales** | Ocio, salidas, restaurantes, compras, regalos | $xxx COP |
+| **Bolsillo 3 — Ahorro / Emergencias** | Intocable salvo emergencia real · 10.5% E.A. | $xxx COP |
 
 ---
 
@@ -95,12 +95,12 @@ Abre `index.html` directamente en Chrome. No necesita servidor.
 
 | Categoría | Objetivo |
 |---|---|
-| Alimentación | $450.000 COP |
-| Transporte | $500.000 COP |
-| Salud | $200.000 COP |
-| Deporte | $240.000 COP |
-| Ocio | $250.000 COP |
-| Regalos | $200.000 COP |
+| Alimentación | $xxx COP |
+| Transporte | $xxx COP |
+| Salud | $xxx COP |
+| Deporte | $xxx COP |
+| Ocio | $xxx COP |
+| Regalos | $xxx COP |
 
 ---
 
