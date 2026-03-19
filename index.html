@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control Financiero — Bolsillos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f5f5f3;color:#1a1a1a;min-height:100vh;padding:16px}
+.container{max-width:520px;margin:0 auto}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.header h1{font-size:16px;font-weight:600}
+.conn{display:flex;align-items:center;gap:6px;font-size:11px;color:#888}
+.dot{width:7px;height:7px;border-radius:50%;background:#EF9F27}
+.dot.ok{background:#639922}.dot.err{background:#E24B4A}
+.tab-bar{display:flex;gap:4px;background:#e8e7e3;padding:4px;border-radius:10px;margin-bottom:16px}
+.tab{flex:1;padding:8px 4px;border:none;background:none;cursor:pointer;font-size:12px;font-weight:400;color:#888;border-radius:7px;transition:all .15s}
+.tab.active{background:#fff;color:#1a1a1a;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.panel{display:none}.panel.active{display:block}
+.card{background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;border:0.5px solid rgba(0,0,0,.08)}
+.metric-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.metric-card{background:#f5f5f3;border-radius:10px;padding:10px 12px}
+.metric-label{font-size:10px;color:#888;margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em}
+.metric-value{font-size:18px;font-weight:600}
+.metric-sub{font-size:10px;color:#888;margin-top:2px}
+.b1c{color:#185FA5}.b2c{color:#0F6E56}.b3c{color:#993C1D}.tcc{color:#534AB7}
+.badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;margin-top:3px}
+.badge-ok{background:#EAF3DE;color:#3B6D11}.badge-warn{background:#FAEEDA;color:#854F0B}.badge-danger{background:#FCEBEB;color:#A32D2D}
+label{display:block;font-size:11px;color:#888;margin-bottom:4px;font-weight:500;text-transform:uppercase;letter-spacing:.03em}
+input,select{width:100%;padding:9px 11px;border:0.5px solid #ddd;border-radius:9px;font-size:13px;background:#fff;color:#1a1a1a;margin-bottom:10px}
+input:focus,select:focus{outline:none;border-color:#185FA5}
+.btn{width:100%;padding:10px;border:0.5px solid #ddd;border-radius:10px;background:#fff;cursor:pointer;font-size:13px;font-weight:500;color:#1a1a1a;transition:all .15s;margin-bottom:8px}
+.btn:hover{background:#f5f5f3}.btn:active{transform:scale(.98)}
+.btn-primary{background:#185FA5;color:#fff;border-color:#185FA5}.btn-primary:hover{background:#0C447C}
+.btn-success{background:#0F6E56;color:#fff;border-color:#0F6E56}.btn-success:hover{background:#085041}
+.alert-box{padding:10px 13px;border-radius:10px;margin-bottom:10px;font-size:12px;line-height:1.5}
+.alert-warn{background:#FAEEDA;color:#854F0B}.alert-danger{background:#FCEBEB;color:#A32D2D}
+.alert-ok{background:#EAF3DE;color:#3B6D11}.alert-info{background:#E6F1FB;color:#185FA5}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form-grid .full{grid-column:1/-1}
+.divider{border:none;border-top:0.5px solid #eee;margin:12px 0}
+.txn-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:0.5px solid #eee}
+.txn-row:last-child{border-bottom:none}
+.txn-cat{font-size:13px;font-weight:500}
+.txn-meta{font-size:11px;color:#888;margin-top:2px}
+.txn-amount{font-size:13px;font-weight:600}
+.neg{color:#A32D2D}.pos{color:#3B6D11}
+.txn-list{max-height:320px;overflow-y:auto}
+.medio-tc{background:#EEEDFE;color:#534AB7;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:500}
+.medio-ef{background:#EAF3DE;color:#3B6D11;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:500}
+.section-label{font-size:11px;font-weight:500;color:#888;margin-bottom:8px;letter-spacing:.03em;text-transform:uppercase}
+.chart-wrap{position:relative;width:100%;height:220px;margin-bottom:4px}
+.cat-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.cat-label{font-size:11px;min-width:90px;color:#888}
+.cat-val{font-size:11px;font-weight:500;min-width:85px;text-align:right;margin-left:auto}
+.progress-bar-wrap{flex:1;background:#f0f0ee;border-radius:3px;height:7px;overflow:hidden}
+.progress-bar{height:100%;border-radius:3px;transition:width .3s}
+.hint{font-size:10px;color:#aaa;margin-top:2px}
+a.sheet-link{font-size:11px;color:#185FA5;text-decoration:none;display:block;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>Control Financiero</h1>
+    <div class="conn">
+      <span class="dot" id="conn-dot"></span>
+      <span id="conn-label">Conectando...</span>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab active" onclick="switchTab('registro',this)">Registrar</button>
+    <button class="tab" onclick="switchTab('saldos',this)">Saldos</button>
+    <button class="tab" onclick="switchTab('dashboard',this)">Dashboard</button>
+    <button class="tab" onclick="switchTab('historial',this)">Historial</button>
+  </div>
+
+  <div class="panel active" id="panel-registro">
+    <div id="alert-area"></div>
+    <div class="card">
+      <div class="form-grid">
+        <div>
+          <label>Categoría</label>
+          <select id="f-cat">
+            <option>Transporte</option><option>Gasolina</option><option>Peaje</option>
+            <option>Parqueadero</option><option>GoPass</option><option>TuLlave</option>
+            <option>Comida</option><option>Farmacia</option><option>Salud</option>
+            <option>Psicólogo</option><option>Deporte</option><option>Ocio</option>
+            <option>Regalos</option><option>Compras</option><option>Eventos</option>
+            <option>Pagos</option>
+          </select>
+        </div>
+        <div>
+          <label>Bolsillo</label>
+          <select id="f-bol">
+            <option value="Bolsillo 1">B1 — Día a día</option>
+            <option value="Bolsillo 2">B2 — Personal</option>
+          </select>
+        </div>
+        <div>
+          <label>Valor (COP)</label>
+          <input type="number" id="f-val" placeholder="80000" min="0">
+        </div>
+        <div>
+          <label>Medio de pago</label>
+          <select id="f-medio">
+            <option value="Efectivo">Efectivo</option>
+            <option value="Tarjeta crédito">Tarjeta crédito</option>
+          </select>
+        </div>
+        <div class="full">
+          <label>Descripción (opcional)</label>
+          <input type="text" id="f-desc" placeholder="Tanque lleno, almuerzo...">
+        </div>
+        <div class="full">
+          <button class="btn btn-primary" id="btn-reg" onclick="registrar()">Guardar en Google Sheets</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <button class="btn btn-success" id="btn-quin" onclick="quincena()">Aplicar ingreso quincenal</button>
+      <p class="hint">B1 +$727.041 · B2 +$436.225 · B3 +$290.086</p>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-saldos">
+    <div class="metric-grid">
+      <div class="metric-card">
+        <div class="metric-label">Bolsillo 1</div>
+        <div class="metric-value b1c" id="s-b1">—</div>
+        <div class="metric-sub">Día a día</div>
+        <div id="badge-b1"></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Bolsillo 2</div>
+        <div class="metric-value b2c" id="s-b2">—</div>
+        <div class="metric-sub">Personal</div>
+        <div id="badge-b2"></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Bolsillo 3</div>
+        <div class="metric-value b3c" id="s-b3">—</div>
+        <div class="metric-sub">Ahorro</div>
+        <span class="badge badge-ok">Intocable</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="metric-label">Total disponible (B1 + B2)</div>
+      <div class="metric-value" id="s-total" style="font-size:22px;margin-top:4px">—</div>
+    </div>
+    <div class="card">
+      <div class="metric-label">Tarjeta crédito pendiente (sesión)</div>
+      <div class="metric-value tcc" id="s-tc" style="margin-top:4px">$0</div>
+      <div class="metric-sub" id="s-tc-sub">TC B1: $0 · TC B2: $0</div>
+    </div>
+    <button class="btn" onclick="sincronizar()">Sincronizar desde Sheets</button>
+  </div>
+
+  <div class="panel" id="panel-dashboard">
+    <div class="card">
+      <div class="section-label">Gastos por categoría</div>
+      <div class="chart-wrap"><canvas id="catChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="section-label">Presupuesto mensual</div>
+      <div id="pres-bars"></div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-historial">
+    <div class="card">
+      <div class="section-label">Movimientos registrados</div>
+      <div class="txn-list" id="txn-list">
+        <p style="font-size:12px;color:#aaa;padding:16px 0;text-align:center">Sin movimientos aún.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── CONFIGURACIÓN ───────────────────────────────────────
+// Reemplaza esta URL con la de tu Apps Script desplegado
+const SCRIPT_URL = 'TU_URL_DE_APPS_SCRIPT';
+
+// Saldos iniciales (COP) — actualiza según tu situación
+const SALDO_INICIAL = { b1: 1321578, b2: 902700, b3: 2756601 };
+
+// Ingresos quincenales (COP)
+const INGRESO_QUINCENAL = { b1: 727041, b2: 436225, b3: 290086 };
+
+// Presupuesto mensual objetivo (COP)
+const PRESUPUESTO = {
+  Alimentación: 450000, Transporte: 500000, Salud: 200000,
+  Deporte: 240000, Ocio: 250000, Regalos: 200000
+};
+// ─────────────────────────────────────────────────────────
+
+const SALDOS = { ...SALDO_INICIAL };
+const TXNS = [];
+const GASTOS_CAT = {};
+const GASTO_REAL = Object.fromEntries(Object.keys(PRESUPUESTO).map(k=>[k,0]));
+const CAT_MAP = {
+  Transporte:'Transporte', Gasolina:'Transporte', Peaje:'Transporte',
+  Parqueadero:'Transporte', GoPass:'Transporte', TuLlave:'Transporte',
+  Comida:'Alimentación', Farmacia:'Salud', Salud:'Salud', 'Psicólogo':'Salud',
+  Deporte:'Deporte', Ocio:'Ocio', Regalos:'Regalos', Compras:'Ocio',
+  Eventos:'Ocio', Pagos:'Transporte'
+};
+let catChartInst = null;
+
+function fmt(n){ return '$'+Math.round(n).toLocaleString('es-CO'); }
+
+function setConn(state, msg){
+  const dot=document.getElementById('conn-dot');
+  const lbl=document.getElementById('conn-label');
+  dot.className='dot'+(state==='ok'?' ok':state==='err'?' err':'');
+  lbl.textContent=msg;
+}
+
+function showAlert(msg, type='info'){
+  const a=document.getElementById('alert-area');
+  a.innerHTML=`<div class="alert-box alert-${type}">${msg}</div>`;
+  if(type==='ok') setTimeout(()=>{ a.innerHTML=''; }, 4000);
+}
+
+function callScript(params){
+  return new Promise((resolve, reject)=>{
+    const id='cb_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    window[id]=(res)=>{ delete window[id]; resolve(res); };
+    const qs=Object.entries({...params, callback:id})
+      .map(([k,v])=>k+'='+encodeURIComponent(typeof v==='object'?JSON.stringify(v):v))
+      .join('&');
+    const s=document.createElement('script');
+    s.src=SCRIPT_URL+'?'+qs;
+    s.onerror=()=>{ delete window[id]; reject(new Error('Error de red — verifica la URL del Apps Script')); };
+    document.head.appendChild(s);
+    setTimeout(()=>{ delete window[id]; reject(new Error('Timeout')); }, 15000);
+  });
+}
+
+async function registrar(){
+  const cat=document.getElementById('f-cat').value;
+  const bol=document.getElementById('f-bol').value;
+  const val=parseFloat(document.getElementById('f-val').value);
+  const medio=document.getElementById('f-medio').value;
+  const desc=document.getElementById('f-desc').value||'';
+  if(!val||val<=0){ showAlert('Ingresa un valor válido.','warn'); return; }
+  const btn=document.getElementById('btn-reg');
+  btn.textContent='Guardando...'; btn.disabled=true;
+  const fecha=new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
+  try{
+    const res=await callScript({action:'append', values:[fecha,cat,desc,bol,'Gasto',medio,val,'','']});
+    if(medio==='Efectivo'){
+      if(bol==='Bolsillo 1') SALDOS.b1-=val;
+      else SALDOS.b2-=val;
+    }
+    if(res && res.b1) SALDOS.b1=res.b1;
+    if(res && res.b2) SALDOS.b2=res.b2;
+    GASTOS_CAT[cat]=(GASTOS_CAT[cat]||0)+val;
+    const grp=CAT_MAP[cat];
+    if(grp && GASTO_REAL[grp]!==undefined) GASTO_REAL[grp]+=val;
+    TXNS.unshift({cat,bol,val,medio,desc,fecha,tipo:'Gasto'});
+    renderSaldos();
+    let msg=`Guardado: ${cat} ${fmt(val)} · ${bol}`;
+    if(medio==='Tarjeta crédito') msg+=' · TC (se descuenta al pagar)';
+    showAlert(msg,'ok');
+    if(SALDOS.b2<0) showAlert(`Bolsillo 2 en sobregiro: ${fmt(SALDOS.b2)}`, 'danger');
+    else if(SALDOS.b2<100000) showAlert(`Bolsillo 2 bajo: ${fmt(SALDOS.b2)} — cuidado`, 'warn');
+    document.getElementById('f-val').value='';
+    document.getElementById('f-desc').value='';
+  } catch(e){
+    showAlert('Error al guardar: '+e.message,'danger');
+  }
+  btn.textContent='Guardar en Google Sheets'; btn.disabled=false;
+}
+
+async function quincena(){
+  const btn=document.getElementById('btn-quin');
+  btn.textContent='Aplicando...'; btn.disabled=true;
+  const fecha=new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
+  try{
+    await callScript({action:'append', values:[fecha,'Ingreso quincena','','Bolsillo 1','Ingreso','—',INGRESO_QUINCENAL.b1,'','']});
+    await callScript({action:'append', values:[fecha,'Ingreso quincena','','Bolsillo 2','Ingreso','—',INGRESO_QUINCENAL.b2,'','']});
+    await callScript({action:'append', values:[fecha,'Ingreso quincena','','Bolsillo 3','Ingreso','—',INGRESO_QUINCENAL.b3,'','']});
+    SALDOS.b1+=INGRESO_QUINCENAL.b1;
+    SALDOS.b2+=INGRESO_QUINCENAL.b2;
+    SALDOS.b3+=INGRESO_QUINCENAL.b3;
+    TXNS.unshift({cat:'Quincena',bol:'B1+B2+B3',val:INGRESO_QUINCENAL.b1+INGRESO_QUINCENAL.b2+INGRESO_QUINCENAL.b3,medio:'—',desc:'',fecha,tipo:'Ingreso'});
+    renderSaldos();
+    showAlert('Quincena aplicada y guardada en Sheets.','ok');
+  } catch(e){
+    showAlert('Error: '+e.message,'danger');
+  }
+  btn.textContent='Aplicar ingreso quincenal'; btn.disabled=false;
+}
+
+async function sincronizar(){
+  setConn('','Sincronizando...');
+  try{
+    const res=await callScript({action:'read'});
+    if(res && res.values && res.values.length>1){
+      const rows=res.values.filter(r=>r[0]&&r[0]!=='Fecha'&&r[0]!=='SALDO INICIAL');
+      const last=rows[rows.length-1];
+      if(last){
+        const b1=parseFloat((last[7]||'').toString().replace(/[^0-9.-]/g,''));
+        const b2=parseFloat((last[8]||'').toString().replace(/[^0-9.-]/g,''));
+        if(!isNaN(b1)&&b1!==0) SALDOS.b1=b1;
+        if(!isNaN(b2)&&b2!==0) SALDOS.b2=b2;
+      }
+      renderSaldos();
+      setConn('ok',`Conectado · ${rows.length} movimientos`);
+    } else {
+      setConn('ok','Conectado · Sheet lista');
+      renderSaldos();
+    }
+  } catch(e){
+    setConn('err','Sin conexión — revisa la URL del Apps Script');
+  }
+}
+
+function renderSaldos(){
+  document.getElementById('s-b1').textContent=fmt(SALDOS.b1);
+  document.getElementById('s-b2').textContent=fmt(SALDOS.b2);
+  document.getElementById('s-b3').textContent=fmt(SALDOS.b3);
+  document.getElementById('s-total').textContent=fmt(SALDOS.b1+SALDOS.b2);
+  const tcTotal=TXNS.filter(t=>t.medio==='Tarjeta crédito'&&t.tipo==='Gasto').reduce((a,t)=>a+t.val,0);
+  const tcB1=TXNS.filter(t=>t.medio==='Tarjeta crédito'&&t.tipo==='Gasto'&&t.bol==='Bolsillo 1').reduce((a,t)=>a+t.val,0);
+  const tcB2=TXNS.filter(t=>t.medio==='Tarjeta crédito'&&t.tipo==='Gasto'&&t.bol==='Bolsillo 2').reduce((a,t)=>a+t.val,0);
+  document.getElementById('s-tc').textContent=fmt(tcTotal);
+  document.getElementById('s-tc-sub').textContent=`TC B1: ${fmt(tcB1)} · TC B2: ${fmt(tcB2)}`;
+  document.getElementById('badge-b1').innerHTML=SALDOS.b1<0?'<span class="badge badge-danger">Sobregiro</span>':'<span class="badge badge-ok">OK</span>';
+  document.getElementById('badge-b2').innerHTML=SALDOS.b2<0?'<span class="badge badge-danger">Sobregiro</span>':SALDOS.b2<100000?'<span class="badge badge-warn">Bajo</span>':'<span class="badge badge-ok">OK</span>';
+}
+
+function renderDashboard(){
+  const cats=Object.keys(GASTOS_CAT);
+  const vals=cats.map(c=>GASTOS_CAT[c]);
+  const colors=['#185FA5','#0F6E56','#993C1D','#534AB7','#3B6D11','#854F0B','#D85A30','#1D9E75','#D4537E','#378ADD'];
+  if(catChartInst) catChartInst.destroy();
+  const wrap=document.querySelector('.chart-wrap');
+  if(cats.length===0){
+    wrap.innerHTML='<p style="font-size:12px;color:#aaa;padding:20px 0;text-align:center">Registra gastos para ver el gráfico.</p>';
+  } else {
+    if(!wrap.querySelector('canvas')) wrap.innerHTML='<canvas id="catChart"></canvas>';
+    catChartInst=new Chart(document.getElementById('catChart'),{
+      type:'doughnut',
+      data:{labels:cats,datasets:[{data:vals,backgroundColor:colors.slice(0,cats.length),borderWidth:0}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:10,padding:10}}}}
+    });
+  }
+  const pb=document.getElementById('pres-bars');
+  pb.innerHTML=Object.keys(PRESUPUESTO).map(k=>{
+    const max=PRESUPUESTO[k],real=GASTO_REAL[k]||0;
+    const pct=Math.min(Math.round(real/max*100),100);
+    const col=pct>=100?'#E24B4A':pct>=75?'#EF9F27':'#639922';
+    return `<div class="cat-row"><span class="cat-label">${k}</span><div class="progress-bar-wrap"><div class="progress-bar" style="width:${pct}%;background:${col}"></div></div><span class="cat-val">${fmt(real)}/${fmt(max)}</span></div>`;
+  }).join('');
+}
+
+function renderHistorial(){
+  const list=document.getElementById('txn-list');
+  if(TXNS.length===0){list.innerHTML='<p style="font-size:12px;color:#aaa;padding:16px 0;text-align:center">Sin movimientos aún.</p>';return;}
+  list.innerHTML=TXNS.slice(0,50).map(t=>{
+    const badge=t.medio==='Tarjeta crédito'?'<span class="medio-tc">TC</span>':t.medio==='—'?'':'<span class="medio-ef">Ef</span>';
+    const amtClass=t.tipo==='Ingreso'?'pos':'neg';
+    const sign=t.tipo==='Ingreso'?'+':'-';
+    return `<div class="txn-row"><div><div class="txn-cat">${t.cat} ${badge}</div><div class="txn-meta">${t.bol}${t.desc?' · '+t.desc:''} · ${t.fecha}</div></div><div class="txn-amount ${amtClass}">${sign}${fmt(t.val)}</div></div>`;
+  }).join('');
+}
+
+function switchTab(id,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-'+id).classList.add('active');
+  if(id==='dashboard') renderDashboard();
+  if(id==='saldos') renderSaldos();
+  if(id==='historial') renderHistorial();
+}
+
+sincronizar();
+</script>
+</body>
+</html>
