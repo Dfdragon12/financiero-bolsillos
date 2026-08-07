@@ -380,9 +380,10 @@ const CATS=[
  ['Deporte','Deporte','nec','B1'],['Pagos','Otros','nec','B1'],
  ['Ocio','Ocio','evi','B2'],['Restaurante','Ocio','evi','B2'],
  ['Starbucks','Ocio','evi','B2'],['Eventos','Ocio','evi','B2'],
- ['Regalos','Regalos','evi','B2'],['Compras','Otros','evi','B2']
+ ['Regalos','Regalos','evi','B2'],['Compras','Otros','evi','B2'],
+ ['Deuda','Deudas','nec','B2']
 ];
-const BUD={'Alimentación':450000,'Transporte':500000,'Salud':200000,'Deporte':240000,'Ocio':250000,'Regalos':200000,'Otros':150000};
+const BUD={'Alimentación':450000,'Transporte':500000,'Salud':200000,'Deporte':240000,'Ocio':250000,'Regalos':200000,'Deudas':303297,'Otros':150000};
 const ICE={cap:131467367.59,i:0.1367/12,cuota:1746608.2};
 const SEED=[['Parqueadero',5000,'B1'],['Comida',18000,'B1'],['Peaje',12000,'B1'],
             ['TuLlave',3200,'B1'],['Gasolina',60000,'B1'],['Restaurante',45000,'B2']];
@@ -400,10 +401,13 @@ function cargar(){
     tc:{cupo:6000000,saldo:823837,corte:15,pago:2},
     deuda:{cuota:303297,total:6,pagadas:0},
     fondo:{saldo:0,meta:3019782,aporte:100000},
-    url:'', lastQ:null
+    borrados:[], url:'', lastQ:null
   },d);
 }
-function guardarLS(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){};pintar()}
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function guardarLS(){persist();pintar()}
+/* si el movimiento ya viajó a la hoja, hay que borrarlo también allá */
+function colaBorrar(m){if(m.sync){S.borrados=S.borrados||[];S.borrados.push(m.id)}}
 
 const fmt=n=>(n<0?'-':'')+'$'+Math.abs(Math.round(n)).toLocaleString('es-CO');
 const num=s=>{const n=parseInt(String(s||'').replace(/[^\d]/g,''),10);return isNaN(n)?0:n};
@@ -501,12 +505,17 @@ function guardar(esIngreso){
 function borrar(id){
   if(!confirm('¿Borrar este movimiento?'))return;
   const i=S.movs.findIndex(m=>m.id===id);if(i<0)return;
+  revertir(i);guardarLS();sync();
+}
+/* deshace el efecto contable de un movimiento y lo saca de la hoja */
+function revertir(i){
   const m=S.movs[i];
   if(m.tipo==='ingreso')S.saldos[m.src]-=m.val;
   else if(m.tipo==='pagoTC'){S.saldos[m.src]+=m.val;S.tc.saldo+=m.val}
   else if(m.src==='TC')S.tc.saldo-=m.val;
   else S.saldos[m.src]+=m.val;
-  S.movs.splice(i,1);guardarLS();
+  colaBorrar(m);S.movs.splice(i,1);
+  return m;
 }
 function pagarTC(){
   const v=num(document.getElementById('tcm').value);
@@ -522,11 +531,20 @@ function pagarTCTotal(){document.getElementById('tcm').value=fmt(S.tc.saldo);pag
 function pagarCuota(){
   if(S.deuda.pagadas>=S.deuda.total){alert('Ya pagaste las 6. Libre.');return}
   const c=S.deuda.cuota;
-  S.movs.push({id:uid(),f:hoy(),ts:new Date().toISOString(),cat:'Pagos',val:c,src:'B2',nec:'nec',
+  S.movs.push({id:uid(),f:hoy(),ts:new Date().toISOString(),cat:'Deuda',val:c,src:'B2',nec:'nec',
     nota:'Préstamo suegra '+(S.deuda.pagadas+1)+'/'+S.deuda.total,tipo:'gasto',sync:0});
   S.saldos.B2-=c;S.deuda.pagadas++;guardarLS();sync();
 }
-function undoCuota(){if(S.deuda.pagadas>0){S.deuda.pagadas--;guardarLS()}}
+function undoCuota(){
+  if(S.deuda.pagadas<=0){alert('No hay cuotas registradas.');return}
+  let i=-1;
+  for(let k=S.movs.length-1;k>=0;k--){
+    if((S.movs[k].nota||'').indexOf('Préstamo suegra')===0){i=k;break}
+  }
+  if(i>=0) revertir(i);            // devuelve la plata a B2 y borra el gasto
+  S.deuda.pagadas--;
+  guardarLS();sync();
+}
 function aportarFE(){
   const v=num(document.getElementById('fev').value)||S.fondo.aporte;
   if(v<=0)return;
@@ -578,6 +596,14 @@ function jsonp(params,ok,fail){
 function sync(manual){
   if(syncing)return;
   if(!S.url){estado('off','sin conectar');return}
+  /* 1º los borrados: la hoja no puede quedar con movimientos fantasma */
+  if(S.borrados&&S.borrados.length){
+    syncing=true;estado('','borrando…');
+    jsonp({action:'borrar',id:S.borrados[0]},
+      ()=>{S.borrados.shift();persist();syncing=false;sync(manual)},
+      e=>{syncing=false;estado('err',e==='red'?'sin conexión':'error');pintarPend()});
+    return;
+  }
   const pend=S.movs.filter(m=>!m.sync);
   if(!pend.length&&!manual){estado('ok','al día');return}
   const m=pend[0];
@@ -585,7 +611,7 @@ function sync(manual){
   syncing=true;estado('','enviando…');
   jsonp({action:'push',id:m.id,f:m.f,ts:m.ts,cat:m.cat,val:m.val,src:m.src,nec:m.nec,
          nota:m.nota||'',tipo:m.tipo},
-    ()=>{m.sync=1;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){};
+    ()=>{m.sync=1;persist();
          syncing=false;S.movs.some(x=>!x.sync)?sync():pushEstado()},
     e=>{syncing=false;estado('err',e==='red'?'sin conexión':'error');pintarPend()});
 }
@@ -610,9 +636,9 @@ function bajar(){
 function estado(c,t){document.getElementById('sdot').className='dot '+c;
   document.getElementById('stxt').textContent=t}
 function pintarPend(){
-  const q=S.movs.filter(m=>!m.sync).length;
+  const q=S.movs.filter(m=>!m.sync).length,b=(S.borrados||[]).length;
   document.getElementById('pend').textContent=S.url
-    ?(q?q+' movimiento(s) pendientes de enviar.':'Todo sincronizado con la hoja.')
+    ?(q||b?(q?q+' por enviar. ':'')+(b?b+' por borrar en la hoja.':''):'Todo sincronizado con la hoja.')
     :'Pega la URL del Apps Script para activar la sincronización. Sin ella la app funciona igual, pero los datos solo viven en este teléfono.';
 }
 
@@ -692,12 +718,12 @@ function pintar(){
     +`<button class="fav" style="border-style:dashed;align-items:center;justify-content:center" onclick="openAdd()">
       <span class="fc" style="color:var(--muted)">+ otro gasto</span></button>`;
 
-  const H=S.movs.filter(m=>m.f===hoy()&&m.tipo!=='ingreso');
+  const H=S.movs.filter(m=>m.f===hoy()&&m.tipo==='gasto');
   document.getElementById('k-hoy').textContent=fmt(H.reduce((a,m)=>a+m.val,0));
   document.getElementById('k-evihoy').textContent=fmt(H.filter(m=>m.nec==='evi').reduce((a,m)=>a+m.val,0));
   document.getElementById('movHoy').innerHTML=lista(H);
 
-  const M=S.movs.filter(m=>m.f.slice(0,7)===mes()&&m.tipo!=='ingreso');
+  const M=S.movs.filter(m=>m.f.slice(0,7)===mes()&&m.tipo==='gasto');
   const tm=M.reduce((a,m)=>a+m.val,0);
   const nec=M.filter(m=>m.nec==='nec').reduce((a,m)=>a+m.val,0),evi=tm-nec;
   const d=new Date().getDate(),dm=new Date(new Date().getFullYear(),new Date().getMonth()+1,0).getDate();
