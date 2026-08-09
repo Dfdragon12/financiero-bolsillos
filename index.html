@@ -165,6 +165,7 @@ tr:last-child td{border-bottom:0}
       </div>
     </div>
 
+    <div id="ultimo"></div>
     <div id="alerts"></div>
 
     <div class="card">
@@ -537,11 +538,12 @@ function favoritos(){
   return top.slice(0,6);
 }
 function rapido(cat,val,src){
-  const nec=cinfo(cat)[2];
-  S.movs.push({id:uid(),f:hoy(),ts:new Date().toISOString(),cat,val,src,nec,nota:'',tipo:'gasto',sync:0});
+  const m={id:uid(),f:hoy(),ts:new Date().toISOString(),cat,val,src,nec:cinfo(cat)[2],
+    nota:'',tipo:'gasto',sync:0};
+  S.movs.push(m);
   if(src==='TC')S.tc.saldo+=val;else S.saldos[src]-=val;
   if(navigator.vibrate)navigator.vibrate(12);
-  guardarLS();sync();
+  mostrarUltimo(m);guardarLS();sync();
 }
 
 /* ---------- facturas: foto + división por bolsillos ---------- */
@@ -626,6 +628,11 @@ async function procesarFoto(input){
       cat:cinfo(i.cat)[0]===i.cat?i.cat:'Compras',
       src:(i.src==='B2'||i.src==='TC')?i.src:'B1'
     })).filter(i=>i.val>0));
+    FX.items.forEach(it=>{                       // refina con las pistas de la nota
+      const c=clasificar(it.cat,FX.comercio+' '+it.desc,it.src);
+      it.cat=c.cat;it.src=c.src;
+    });
+    fxPintar();
   }catch(e){
     cerrarFactura();
     alert('No pude leer la factura.\n\n'+e.message+'\n\nPuedes dividirla a mano.');
@@ -699,6 +706,123 @@ function fxGuardar(){
   if(navigator.vibrate)navigator.vibrate([12,40,12]);
 }
 
+/* ---------- clasificación automática y comentario ---------- */
+/* Palabras en la nota que mandan más que la categoría */
+const PISTAS=[
+ [/starbucks|juan valdez|caf[eé]|tinto/i,'Starbucks','B2','evi'],
+ [/cerveza|bar |bbc|club colombia|aguardiente|ron |trago|licor/i,'Ocio','B2','evi'],
+ [/cine|cinemark|procinal|concierto|teatro/i,'Eventos','B2','evi'],
+ [/rappi|domicilio|mcdonald|kfc|frisby|crepes|burger|pizza|sushi|restaurante/i,'Restaurante','B2','evi'],
+ [/parqueadero|parking|zona azul/i,'Parqueadero','B1','evi'],
+ [/peaje/i,'Peaje','B1','nec'],
+ [/terpel|texaco|primax|biomax|gasolina|esso|mobil/i,'Gasolina','B1','nec'],
+ [/farmacia|cruz verde|farmatodo|droguer[ií]a|locatel/i,'Farmacia','B1','nec'],
+ [/[eé]xito|carulla|olimpica|ara |d1|jumbo|makro|mercado/i,'Comida','B1','nec'],
+ [/uber|didi|cabify|taxi|transmilenio|tullave|tu llave/i,'Transporte','B1','nec'],
+ [/gym|gimnasio|smartfit|bodytech|crossfit/i,'Deporte','B1','nec'],
+ [/psic[oó]log/i,'Psicólogo','B1','nec']
+];
+function clasificar(cat,nota,srcElegido){
+  const base=cinfo(cat);
+  let r={cat,src:srcElegido||base[3],nec:base[2],razon:''};
+  for(const[re,c,s,n]of PISTAS){
+    if(nota&&re.test(nota)){
+      r.cat=c;r.nec=n;
+      if(c!==cat)r.razon='Lo reclasifiqué de '+cat+' a '+c+' por la nota.';
+      if(!srcElegido||srcElegido===base[3])r.src=s;
+      break;
+    }
+  }
+  return r;
+}
+
+let ULTIMO=null;
+function comentario(m){
+  const mesM=S.movs.filter(x=>x.f.slice(0,7)===mes()&&x.tipo==='gasto');
+  const grupo=cinfo(m.cat)[1], pres=BUD[grupo]||0;
+  const gastoGrupo=mesM.filter(x=>cinfo(x.cat)[1]===grupo).reduce((a,x)=>a+x.val,0);
+  const mismos=mesM.filter(x=>x.cat===m.cat);
+  const totalCat=mismos.reduce((a,x)=>a+x.val,0);
+  const tot=mesM.reduce((a,x)=>a+x.val,0);
+  const evi=mesM.filter(x=>x.nec==='evi').reduce((a,x)=>a+x.val,0);
+  const dq=diasQuincena(), saldo=m.src==='TC'?null:S.saldos[m.src];
+  const bolsillo=m.src==='TC'?'la tarjeta':'Bolsillo '+m.src.slice(1);
+
+  // en orden de importancia: se muestra la primera que aplique
+  if(saldo!==null&&saldo<0)
+    return['bad',`Esto dejó ${bolsillo} en ${fmt(saldo)}. Estás en sobregiro y faltan ${dq} días para la quincena. Frena aquí.`];
+  if(saldo!==null&&saldo<80000)
+    return['bad',`${bolsillo} queda en ${fmt(saldo)} y faltan ${dq} días. Eso es ${fmt(saldo/Math.max(1,dq))} por día.`];
+  if(m.src==='TC')
+    return['warn',`Va a la tarjeta: ahora debes ${fmt(S.tc.saldo)}. Esa plata ya está comprometida de tu bolsillo aunque el saldo no haya bajado. Vence el día ${S.tc.pago}.`];
+  if(pres&&gastoGrupo>pres)
+    return['bad',`Con esto excediste ${grupo}: ${fmt(gastoGrupo)} de ${fmt(pres)}. Vas ${fmt(gastoGrupo-pres)} por encima.`];
+  if(pres&&gastoGrupo>pres*0.8)
+    return['warn',`${grupo} va en ${(gastoGrupo/pres*100).toFixed(0)}% (${fmt(gastoGrupo)} de ${fmt(pres)}). Te quedan ${fmt(pres-gastoGrupo)} para el resto del mes.`];
+  if(mismos.length>=3&&m.nec==='evi')
+    return['warn',`Es tu ${mismos.length}º ${m.cat} del mes: ${fmt(totalCat)} acumulados. Al ritmo del mes completo son ${fmt(totalCat/new Date().getDate()*30)}.`];
+  if(tot>0&&evi/tot>0.35&&m.nec==='evi')
+    return['warn',`${(evi/tot*100).toFixed(0)}% de tu gasto del mes es evitable (${fmt(evi)}). Este entra ahí.`];
+  if(mismos.length>2){
+    const prom=totalCat/mismos.length;
+    if(m.val>prom*2)
+      return['warn',`${fmt(m.val)} está muy por encima de tu ${m.cat} promedio (${fmt(prom)}). ¿Fue algo puntual?`];
+  }
+  const libre=S.saldos.B1+S.saldos.B2-S.tc.saldo;
+  if(libre>0)
+    return['ok',`Registrado en ${bolsillo}. Te quedan ${fmt(libre/Math.max(1,dq))} por día hasta la quincena.`];
+  return['ok',`Registrado en ${bolsillo}.`];
+}
+
+function mostrarUltimo(m,razon){
+  const[tono,txt]=comentario(m);
+  ULTIMO={m,tono,txt,razon:razon||'',ia:''};
+  pintarUltimo();
+}
+function pintarUltimo(){
+  const c=document.getElementById('ultimo');
+  if(!ULTIMO){c.innerHTML='';return}
+  const{m,tono,txt,razon,ia}=ULTIMO;
+  c.innerHTML=`<div class="alert ${tono}" style="position:relative;padding-right:34px">
+    <b>${fmt(m.val)} · ${m.cat}</b> <span class="tag ${m.nec}">${m.nec==='nec'?'necesario':'evitable'}</span><br>
+    ${razon?`<span style="opacity:.85">${razon}</span><br>`:''}${txt}
+    ${ia?`<br><br><b>Opinión:</b> ${ia}`:''}
+    ${(!ia&&S.apiKey)?`<br><button class="sm ghost" style="margin-top:8px" onclick="pedirOpinion()">Pedir opinión a Claude</button>`:''}
+    <button style="position:absolute;top:6px;right:6px;background:none;color:inherit;padding:4px 8px;opacity:.5"
+      onclick="ULTIMO=null;pintarUltimo()">✕</button></div>`;
+}
+async function pedirOpinion(){
+  if(!ULTIMO||!S.apiKey)return;
+  ULTIMO.ia='pensando…';pintarUltimo();
+  const m=ULTIMO.m;
+  const mesM=S.movs.filter(x=>x.f.slice(0,7)===mes()&&x.tipo==='gasto');
+  const tot=mesM.reduce((a,x)=>a+x.val,0);
+  const evi=mesM.filter(x=>x.nec==='evi').reduce((a,x)=>a+x.val,0);
+  const ctx=`Diego, 24 años, Bogotá. Neto mensual $2.907.166 con sistema 50/30/20.
+Saldos: B1 (necesidades) ${fmt(S.saldos.B1)}, B2 (gustos) ${fmt(S.saldos.B2)}, B3 (ahorro, intocable) ${fmt(S.saldos.B3)}.
+Tarjeta debe ${fmt(S.tc.saldo)} de $6.000.000 de cupo, vence el día ${S.tc.pago}.
+Debe 6 cuotas de $303.297 a su suegra (lleva ${S.deuda.pagadas}) por un aniversario que financió con deuda.
+Fondo para fechas especiales: ${fmt(S.fondo.saldo)} de meta $3.019.782.
+Este mes lleva gastados ${fmt(tot)}, de los cuales ${fmt(evi)} son evitables.
+Faltan ${diasQuincena()} días para la quincena.
+Acaba de registrar: ${m.cat} ${fmt(m.val)}${m.nota?' ('+m.nota+')':''} desde ${m.src}.`;
+  try{
+    const r=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'content-type':'application/json','x-api-key':S.apiKey,
+        'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:220,
+        messages:[{role:'user',content:ctx+`
+
+Dale un comentario de máximo 2 frases sobre este gasto puntual. Directo, con números, sin moralizar ni felicitar de más. Si el gasto está bien, dilo corto. Si hay un patrón preocupante o una consecuencia concreta, señálala. Español de Colombia. Sin saludo ni despedida.`}]})
+    });
+    if(!r.ok)throw new Error('error '+r.status);
+    const j=await r.json();
+    ULTIMO.ia=(j.content||[]).map(c=>c.text||'').join('').trim();
+  }catch(e){ULTIMO.ia='No pude consultar ('+e.message+').'}
+  pintarUltimo();
+}
+
 /* ---------- racha ---------- */
 function racha(){
   const set=new Set(S.movs.map(m=>m.f));
@@ -715,14 +839,22 @@ function guardar(esIngreso){
   const val=num(document.getElementById('a-val').value);
   if(val<=0){alert('Escribe un valor.');return}
   if(esIngreso&&sel.src==='TC'){alert('Un ingreso no entra a la tarjeta.');return}
-  const nec=sel.nec==='auto'?cinfo(sel.cat)[2]:sel.nec;
-  S.movs.push({id:uid(),f:hoy(),ts:new Date().toISOString(),cat:esIngreso?'Ingreso':sel.cat,val,
-    src:sel.src,nec,nota:document.getElementById('a-nota').value.trim(),
-    tipo:esIngreso?'ingreso':'gasto',sync:0});
-  if(esIngreso)S.saldos[sel.src]+=val;
-  else if(sel.src==='TC')S.tc.saldo+=val;
-  else S.saldos[sel.src]-=val;
-  closeAdd();guardarLS();sync();
+  const nota=document.getElementById('a-nota').value.trim();
+  let cat=sel.cat, src=sel.src, nec, razon='';
+  if(esIngreso){cat='Ingreso';nec='nec'}
+  else if(sel.nec==='auto'){
+    const c=clasificar(sel.cat,nota,sel.src);
+    cat=c.cat;src=c.src;nec=c.nec;razon=c.razon;
+  } else nec=sel.nec;
+  const m={id:uid(),f:hoy(),ts:new Date().toISOString(),cat,val,src,nec,nota,
+    tipo:esIngreso?'ingreso':'gasto',sync:0};
+  S.movs.push(m);
+  if(esIngreso)S.saldos[src]+=val;
+  else if(src==='TC')S.tc.saldo+=val;
+  else S.saldos[src]-=val;
+  closeAdd();
+  if(!esIngreso){go('hoy');mostrarUltimo(m,razon)}
+  guardarLS();sync();
   if(navigator.vibrate)navigator.vibrate(12);
 }
 function borrar(id){
@@ -1079,7 +1211,7 @@ function pintar(){
     ?`<b>${ev.n}</b> en ${ev.d} días (~${fmt(ev.c)}). Tienes ${fmt(F.saldo)}. ${F.saldo>=ev.c?'Cubierto.':'Te faltan '+fmt(ev.c-F.saldo)+' — son '+fmt((ev.c-F.saldo)/Math.max(1,Math.ceil(ev.d/30)))+' al mes.'}`
     :'';
 
-  alertas(tm,evi,proy,presT,libre,comp,dq);calendario();pintarPend();simular();
+  pintarUltimo();alertas(tm,evi,proy,presT,libre,comp,dq);calendario();pintarPend();simular();
 }
 function vv(id,v){const e=document.getElementById(id);e.textContent=fmt(v);e.classList.toggle('neg',v<0)}
 function lista(arr,editable){
