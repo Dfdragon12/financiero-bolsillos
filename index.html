@@ -369,6 +369,24 @@ tr:last-child td{border-bottom:0}
   <button data-s="conf" onclick="go('conf')"><span class="g">⚙</span>Ajustes</button>
 </nav>
 
+<div class="ov" id="ove" onclick="if(event.target===this)cerrarEdit()">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h1 style="font-size:17px;margin:0 0 3px">Editar movimiento</h1>
+    <p class="mini" style="margin:0 0 14px" id="ed-info"></p>
+    <div class="f"><label>Valor</label><input id="ed-val" type="text" inputmode="numeric" oninput="fmtIn(this)"></div>
+    <div class="f"><label>Nota</label><input id="ed-nota"></div>
+    <div class="f"><label>Categoría</label><div class="chips" id="ed-cat"></div></div>
+    <div class="f"><label>Bolsillo</label><div class="chips" id="ed-src"></div></div>
+    <div class="f"><label>Juicio</label><div class="chips" id="ed-nec"></div></div>
+    <button class="wide" onclick="edGuardar()">Guardar cambios</button>
+    <div class="row" style="margin-top:9px">
+      <button class="ghost sm" style="flex:1;color:var(--bad)" onclick="edBorrar()">Borrar</button>
+      <button class="ghost sm" style="flex:1" onclick="cerrarEdit()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <div class="ov" id="ovf" onclick="if(event.target===this)cerrarFactura()">
   <div class="sheet">
     <div class="grab"></div>
@@ -712,6 +730,40 @@ function borrar(id){
   const i=S.movs.findIndex(m=>m.id===id);if(i<0)return;
   revertir(i);guardarLS();sync();
 }
+
+/* ---------- editar un movimiento ya registrado ---------- */
+let ED={id:null,cat:'Comida',src:'B1',nec:'nec'};
+function abrirEdit(id){
+  const m=S.movs.find(x=>x.id===id);if(!m)return;
+  if(m.tipo!=='gasto'){if(confirm('Este movimiento no es un gasto normal. ¿Borrarlo?'))borrar(id);return}
+  ED={id,cat:m.cat,src:m.src,nec:m.nec};
+  document.getElementById('ed-val').value=fmt(m.val);
+  document.getElementById('ed-nota').value=m.nota||'';
+  document.getElementById('ed-info').textContent=m.f+(m.sync?' · en la hoja':' · pendiente de enviar');
+  edChips();
+  document.getElementById('ove').classList.add('show');
+}
+function cerrarEdit(){document.getElementById('ove').classList.remove('show')}
+function edChips(){
+  document.getElementById('ed-cat').innerHTML=CATS.map(c=>
+    `<div class="chip ${ED.cat===c[0]?'on':''}" onclick="ED.cat='${c[0]}';ED.src=cinfo('${c[0]}')[3];ED.nec=cinfo('${c[0]}')[2];edChips()">${c[0]}</div>`).join('');
+  document.getElementById('ed-src').innerHTML=[['B1','Bolsillo 1'],['B2','Bolsillo 2'],['TC','Tarjeta']].map(([v,l])=>
+    `<div class="chip ${ED.src===v?'on':''}" onclick="ED.src='${v}';edChips()">${l}</div>`).join('');
+  document.getElementById('ed-nec').innerHTML=[['nec','Necesario'],['evi','Evitable']].map(([v,l])=>
+    `<div class="chip ${ED.nec===v?'on':''}" onclick="ED.nec='${v}';edChips()">${l}</div>`).join('');
+}
+function edBorrar(){const id=ED.id;cerrarEdit();borrar(id)}
+function edGuardar(){
+  const i=S.movs.findIndex(x=>x.id===ED.id);if(i<0){cerrarEdit();return}
+  const val=num(document.getElementById('ed-val').value);
+  if(val<=0){alert('El valor debe ser mayor a cero.');return}
+  const nota=document.getElementById('ed-nota').value.trim();
+  const f=S.movs[i].f, ts=S.movs[i].ts;
+  revertir(i);                                  // deshace el efecto viejo y lo saca de la hoja
+  S.movs.push({id:uid(),f,ts,cat:ED.cat,val,src:ED.src,nec:ED.nec,nota,tipo:'gasto',sync:0});
+  if(ED.src==='TC')S.tc.saldo+=val;else S.saldos[ED.src]-=val;
+  cerrarEdit();guardarLS();sync();
+}
 /* deshace el efecto contable de un movimiento y lo saca de la hoja */
 function revertir(i){
   const m=S.movs[i];
@@ -969,7 +1021,7 @@ function pintar(){
   const H=S.movs.filter(m=>m.f===hoy()&&m.tipo==='gasto');
   document.getElementById('k-hoy').textContent=fmt(H.reduce((a,m)=>a+m.val,0));
   document.getElementById('k-evihoy').textContent=fmt(H.filter(m=>m.nec==='evi').reduce((a,m)=>a+m.val,0));
-  document.getElementById('movHoy').innerHTML=lista(H);
+  document.getElementById('movHoy').innerHTML=lista(H,true);
 
   const M=S.movs.filter(m=>m.f.slice(0,7)===mes()&&m.tipo==='gasto');
   const tm=M.reduce((a,m)=>a+m.val,0);
@@ -1030,11 +1082,11 @@ function pintar(){
   alertas(tm,evi,proy,presT,libre,comp,dq);calendario();pintarPend();simular();
 }
 function vv(id,v){const e=document.getElementById(id);e.textContent=fmt(v);e.classList.toggle('neg',v<0)}
-function lista(arr,conBorrar){
+function lista(arr,editable){
   if(!arr.length)return '<div class="empty">Nada registrado todavía.</div>';
   const col={B1:'var(--b1)',B2:'var(--b2)',B3:'var(--b3)',TC:'var(--tc)'};
   return arr.slice().sort((a,b)=>(b.ts||b.f)<(a.ts||a.f)?-1:1).map(m=>
-    `<div class="mv" ${conBorrar?`onclick="borrar('${m.id}')"`:''}>
+    `<div class="mv" ${editable?`onclick="abrirEdit('${m.id}')"`:''}>
       <div class="ic" style="background:${col[m.src]||'#999'}">${m.src}</div>
       <div class="tx"><div class="t1">${m.cat}${m.nota?' · '+m.nota:''}</div>
         <div class="t2">${m.f.slice(8)}/${m.f.slice(5,7)} ${m.tipo==='gasto'?`<span class="tag ${m.nec}">${m.nec==='nec'?'necesario':'evitable'}</span>`:''}${m.sync?'':' · pendiente'}</div></div>
