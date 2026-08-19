@@ -201,6 +201,19 @@ tr:last-child td{border-bottom:0}
 
   <!-- MES -->
   <section id="s-mes">
+    <div class="chips" style="margin-bottom:12px" id="perSel"></div>
+    <div class="card">
+      <h2 id="an-tit">Análisis</h2>
+      <div class="kpi">
+        <div>Entró<b id="an-in">—</b></div>
+        <div>Salió de bolsillos<b id="an-out">—</b></div>
+        <div>Superávit<b id="an-sup">—</b></div>
+        <div>Evitable<b id="an-evi">—</b></div>
+      </div>
+      <div id="an-ver" style="margin-top:13px"></div>
+      <div id="an-cmp"></div>
+      <div id="an-cats" style="margin-top:6px"></div>
+    </div>
     <div class="pockets">
       <div class="pk a"><div class="l">B1 · Día a día</div><div class="v" id="v1">—</div><div class="n">50%</div></div>
       <div class="pk b"><div class="l">B2 · Personal</div><div class="v" id="v2">—</div><div class="n">30%</div></div>
@@ -267,6 +280,19 @@ tr:last-child td{border-bottom:0}
 
   <!-- DEUDAS -->
   <section id="s-deuda">
+    <div class="card">
+      <h2>Lista de deseos</h2>
+      <div class="row" style="gap:7px">
+        <input id="ds-n" placeholder="qué quieres comprar" style="flex:2;min-width:130px">
+        <input id="ds-v" inputmode="numeric" placeholder="$0" style="flex:1;min-width:92px;text-align:right">
+      </div>
+      <div class="row" style="gap:7px;margin-top:8px">
+        <select id="ds-p" style="flex:1"><option value="1">Prioridad alta</option><option value="2" selected>Media</option><option value="3">Baja</option></select>
+        <button class="sm" onclick="addDeseo()">Añadir</button>
+      </div>
+      <div id="ds-cap" style="margin-top:13px"></div>
+      <div id="ds-list"></div>
+    </div>
     <div class="card">
       <h2>Fondo Fechas Especiales</h2>
       <div class="kpi">
@@ -465,7 +491,7 @@ function cargar(){
     tc:{cupo:6000000,saldo:823837,corte:15,pago:2},
     deuda:{cuota:303297,total:6,pagadas:0},
     fondo:{saldo:0,meta:3019782,aporte:100000},
-    borrados:[], tumbas:[], url:'', apiKey:'', lastQ:null
+    deseos:[], borrados:[], tumbas:[], url:'', apiKey:'', lastQ:null
   },d);
 }
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
@@ -704,6 +730,176 @@ function fxGuardar(){
   });
   cerrarFactura();guardarLS();sync();
   if(navigator.vibrate)navigator.vibrate([12,40,12]);
+}
+
+/* ---------- análisis por quincena ---------- */
+let PER='qa';   // qa = quincena actual, qp = anterior, mes
+
+/* Devuelve el rango de una quincena. n=0 la actual, n=-1 la anterior, etc. */
+function rangoQ(n){
+  const hy=new Date(), y=hy.getFullYear(), M=hy.getMonth(), d=hy.getDate();
+  let idx=(M*2)+(d<=15?0:1)+n;              // índice global de quincena
+  const yy=y+Math.floor(idx/24), ii=((idx%24)+24)%24;
+  const mm=Math.floor(ii/2), seg=ii%2;
+  const ult=new Date(yy,mm+1,0).getDate();
+  const p=x=>yy+'-'+String(mm+1).padStart(2,'0')+'-'+String(x).padStart(2,'0');
+  const nom=new Date(yy,mm,1).toLocaleDateString('es-CO',{month:'long'});
+  return seg===0
+    ? {a:p(1),b:p(15),lbl:'1–15 de '+nom}
+    : {a:p(16),b:p(ult),lbl:'16–'+ult+' de '+nom};
+}
+function rangoMes(){
+  const hy=new Date(),ult=new Date(hy.getFullYear(),hy.getMonth()+1,0).getDate();
+  const m=mes();
+  return {a:m+'-01',b:m+'-'+ult,lbl:new Date(hy.getFullYear(),hy.getMonth(),1).toLocaleDateString('es-CO',{month:'long',year:'numeric'})};
+}
+function rango(){return PER==='mes'?rangoMes():rangoQ(PER==='qp'?-1:0)}
+
+/* Efectivo que realmente salió de los bolsillos en un rango.
+   Las compras con TC no salen del bolsillo; lo que sale es el pago de la tarjeta. */
+function analizar(r){
+  const en=S.movs.filter(m=>m.f>=r.a&&m.f<=r.b);
+  const gastos=en.filter(m=>m.tipo==='gasto');
+  const salida=en.filter(m=>(m.tipo==='gasto'&&m.src!=='TC')||m.tipo==='pagoTC')
+                 .reduce((a,m)=>a+m.val,0);
+  const ingresoExtra=en.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+m.val,0);
+  const quincenas=PER==='mes'?2:1;
+  const entrada=(ING.B1+ING.B2)*quincenas+ingresoExtra;
+  const tot=gastos.reduce((a,m)=>a+m.val,0);
+  const evi=gastos.filter(m=>m.nec==='evi').reduce((a,m)=>a+m.val,0);
+  const porCat={};gastos.forEach(m=>porCat[m.cat]=(porCat[m.cat]||0)+m.val);
+  return {entrada,salida,sup:entrada-salida,tot,evi,nec:tot-evi,n:gastos.length,porCat,
+          conTC:gastos.filter(m=>m.src==='TC').reduce((a,m)=>a+m.val,0)};
+}
+
+function pintarAnalisis(){
+  document.getElementById('perSel').innerHTML=
+    [['qa','Quincena actual'],['qp','Quincena anterior'],['mes','Mes completo']].map(([v,l])=>
+    `<div class="chip ${PER===v?'on':''}" onclick="PER='${v}';pintar()">${l}</div>`).join('');
+  const r=rango(), A=analizar(r);
+  document.getElementById('an-tit').textContent='Análisis · '+r.lbl;
+  document.getElementById('an-in').textContent=fmt(A.entrada);
+  document.getElementById('an-out').textContent=fmt(A.salida);
+  const sup=document.getElementById('an-sup');
+  sup.textContent=fmt(A.sup);sup.classList.toggle('neg',A.sup<0);
+  document.getElementById('an-evi').textContent=fmt(A.evi);
+
+  const enCurso=(PER==='qa'||PER==='mes')&&hoy()<=r.b;
+  document.getElementById('an-ver').innerHTML=
+    A.sup>=0
+      ? `<div class="alert ok"><b>${enCurso?'Vas cerrando en positivo':'Cerraste en positivo'}: ${fmt(A.sup)}.</b> ${
+          A.sup>0?'Eso es lo que puede ir a tus deseos o al ICETEX.':''}</div>`
+      : `<div class="alert bad"><b>${enCurso?'Vas en déficit':'Cerraste en déficit'}: ${fmt(-A.sup)}.</b> Saliste ${fmt(A.salida)} contra ${fmt(A.entrada)} que entró.</div>`;
+
+  // comparativo con la quincena anterior
+  let cmp='';
+  if(PER!=='mes'){
+    const prev=analizar(rangoQ(PER==='qp'?-2:-1));
+    if(prev.n>0){
+      const d=A.tot-prev.tot, p=prev.tot?Math.abs(d/prev.tot*100).toFixed(0):0;
+      cmp=`<div class="alert ${d>0?'warn':'ok'}">Gastaste ${fmt(Math.abs(d))} ${d>0?'más':'menos'} que la quincena anterior (${p}%). Antes ${fmt(prev.tot)}, ahora ${fmt(A.tot)}.</div>`;
+    }
+  }
+  if(A.conTC>0)cmp+=`<div class="alert info">${fmt(A.conTC)} de esos gastos fueron con tarjeta: aún no salieron de tus bolsillos, pero ya están comprometidos.</div>`;
+  document.getElementById('an-cmp').innerHTML=cmp;
+
+  const ord=Object.entries(A.porCat).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  document.getElementById('an-cats').innerHTML=ord.length
+    ? '<table>'+ord.map(([c,v])=>`<tr><td>${c}</td><td>${fmt(v)} · ${A.tot?(v/A.tot*100).toFixed(0):0}%</td></tr>`).join('')+'</table>'
+    : '<div class="empty">Sin movimientos en este periodo.</div>';
+}
+
+/* ---------- lista de deseos ---------- */
+/* Capacidad medida del comportamiento real, no del presupuesto teórico */
+function capacidad(){
+  /* Techo teórico: lo que entra menos los gastos que no son opcionales.
+     Nunca prometemos más que esto, por bien que se vea una quincena suelta. */
+  const esencial=(BUD['Alimentación']||0)+(BUD['Transporte']||0)+(BUD['Salud']||0)+
+                 (BUD['Deudas']||0)+(S.fondo.aporte||0);
+  const techo=Math.max(0,(ING.B1+ING.B2)*2-esencial);
+
+  const hist=[];
+  for(let i=1;i<=6;i++){
+    const A=analizar(rangoQ(-i));
+    if(A.n>=3)hist.push(A.sup);          // menos de 3 movimientos = quincena mal registrada
+  }
+  if(hist.length>=2){
+    const peor=Math.min(...hist);
+    const prom=hist.reduce((a,b)=>a+b,0)/hist.length;
+    /* Se usa la PEOR quincena, no el promedio: un plan de compras que depende
+       de tu mejor mes es un plan que se rompe. */
+    const q=Math.max(0,Math.min(peor,techo/2));
+    return {mes:q*2,quincena:q,n:hist.length,real:true,peor,prom,techo};
+  }
+  /* Sin historia confiable: estimado del presupuesto */
+  const est=Math.max(0,(ING.B1+ING.B2)*2-Object.values(BUD).reduce((a,b)=>a+b,0));
+  return {mes:est,quincena:est/2,n:hist.length,real:false,peor:null,techo};
+}
+function bloqueos(){
+  const b=[];
+  if(S.tc.saldo>0)b.push(['Tarjeta con '+fmt(S.tc.saldo),'Págala completa antes de comprar por gusto. Su interés supera cualquier ahorro.']);
+  const ev=proximoEvento();
+  if(ev&&ev.d<=90&&S.fondo.saldo<ev.c)
+    b.push([ev.n+' en '+ev.d+' días',`El fondo tiene ${fmt(S.fondo.saldo)} de ${fmt(ev.c)}. Esto es lo que te llevó a pedirle prestado a tu suegra.`]);
+  if(S.deuda.pagadas<S.deuda.total)
+    b.push([`Debes ${S.deuda.total-S.deuda.pagadas} cuotas a tu suegra`,`${fmt((S.deuda.total-S.deuda.pagadas)*S.deuda.cuota)} pendientes. Se liberan $303.297/mes al terminar.`]);
+  if(S.saldos.B3<3560158)b.push(['Colchón por debajo de la base','B3 es tu única red. Repónlo antes de gastar por gusto.']);
+  if(S.saldos.B1<0||S.saldos.B2<0)b.push(['Bolsillo en sobregiro','Sal del rojo primero.']);
+  return b;
+}
+function addDeseo(){
+  const n=document.getElementById('ds-n').value.trim();
+  const v=num(document.getElementById('ds-v').value);
+  if(!n||v<=0){alert('Escribe qué quieres y cuánto cuesta.');return}
+  S.deseos=S.deseos||[];
+  S.deseos.push({id:uid(),n,v,p:+document.getElementById('ds-p').value});
+  document.getElementById('ds-n').value='';document.getElementById('ds-v').value='';
+  guardarLS();
+}
+function delDeseo(id){S.deseos=(S.deseos||[]).filter(d=>d.id!==id);guardarLS()}
+
+function pintarDeseos(){
+  const C=capacidad(), B=bloqueos();
+  document.getElementById('ds-cap').innerHTML=
+    `<div class="alert ${C.mes>0?'ok':'warn'}">
+      <b>Tu capacidad real: ${fmt(C.mes)}/mes</b> (${fmt(C.quincena)} por quincena).<br>
+      ${C.real
+        ? (C.peor>C.techo/2
+            ? `Tus últimas ${C.n} quincenas dan más (${fmt(C.peor)} la peor), pero lo topo en ${fmt(C.techo)}/mes: es lo que queda después de comida, transporte, salud, deudas y el fondo de fechas.`
+            : `Medido de tus últimas ${C.n} quincenas. Uso tu <b>peor</b> quincena (${fmt(C.peor)}), no el promedio (${fmt(C.prom)}): un plan que depende de tu mejor mes se rompe.`)
+        : 'Estimado del presupuesto — aún no tienes suficientes quincenas bien registradas. Se vuelve exacto con el uso.'}
+    </div>`+
+    (B.length?B.map(x=>`<div class="alert warn"><b>${x[0]}.</b> ${x[1]}</div>`).join(''):'');
+
+  const L=(S.deseos||[]).slice().sort((a,b)=>a.p-b.p||a.v-b.v);
+  if(!L.length){document.getElementById('ds-list').innerHTML='<div class="empty">Añade lo que quieres comprar y te digo cuándo.</div>';return}
+
+  const cap=C.mes, hayBloqueo=B.length>0;
+  let acumMeses=0;
+  document.getElementById('ds-list').innerHTML=L.map((d,i)=>{
+    let txt,tono;
+    if(cap<=0){txt='Con tu ritmo actual no estás generando excedente. Primero hay que liberar margen.';tono='bad'}
+    else{
+      const meses=(d.v/cap);
+      acumMeses+=meses;
+      const f=new Date();f.setMonth(f.getMonth()+Math.ceil(acumMeses));
+      const cuando=f.toLocaleDateString('es-CO',{month:'long',year:'numeric'});
+      const ahorroMes=d.v/Math.max(1,Math.ceil(acumMeses));
+      const nm=Math.ceil(acumMeses);
+      txt=`Apartando ${fmt(cap)}/mes lo tienes en <b>${cuando}</b> (${nm} ${nm===1?'mes':'meses'}${i>0?', después de los anteriores':''}).`;
+      tono=Math.ceil(acumMeses)<=3?'ok':Math.ceil(acumMeses)<=8?'warn':'bad';
+      if(hayBloqueo)txt+=' <b>Pero primero resuelve lo de arriba.</b>';
+    }
+    const et=['','alta','media','baja'][d.p];
+    return `<div class="card" style="padding:12px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div><b>${i+1}. ${d.n}</b> <span class="tag ${d.p===1?'evi':'nec'}">${et}</span>
+          <div style="font-size:19px;font-weight:700;font-variant-numeric:tabular-nums">${fmt(d.v)}</div></div>
+        <button class="sm ghost" style="color:var(--bad)" onclick="delDeseo('${d.id}')">✕</button>
+      </div>
+      <div class="alert ${tono}" style="margin:9px 0 0">${txt}</div>
+    </div>`;
+  }).join('');
 }
 
 /* ---------- clasificación automática y comentario ---------- */
@@ -1211,7 +1407,8 @@ function pintar(){
     ?`<b>${ev.n}</b> en ${ev.d} días (~${fmt(ev.c)}). Tienes ${fmt(F.saldo)}. ${F.saldo>=ev.c?'Cubierto.':'Te faltan '+fmt(ev.c-F.saldo)+' — son '+fmt((ev.c-F.saldo)/Math.max(1,Math.ceil(ev.d/30)))+' al mes.'}`
     :'';
 
-  pintarUltimo();alertas(tm,evi,proy,presT,libre,comp,dq);calendario();pintarPend();simular();
+  pintarUltimo();pintarAnalisis();pintarDeseos();
+  alertas(tm,evi,proy,presT,libre,comp,dq);calendario();pintarPend();simular();
 }
 function vv(id,v){const e=document.getElementById(id);e.textContent=fmt(v);e.classList.toggle('neg',v<0)}
 function lista(arr,editable){
