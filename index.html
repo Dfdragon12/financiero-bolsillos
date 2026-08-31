@@ -374,6 +374,7 @@ tr:last-child td{border-bottom:0}
   <section id="s-conf">
     <div class="card">
       <h2>Quincena</h2>
+      <div id="q-prox" style="margin-bottom:12px"></div>
       <button class="wide" onclick="quincena()">Aplicar ingreso quincenal</button>
       <p class="mini">B1 +$727.041 · B2 +$436.225 · B3 +$290.086 = neto $1.453.583<br>Última aplicada: <b id="lastQ">nunca</b></p>
     </div>
@@ -503,7 +504,7 @@ tr:last-child td{border-bottom:0}
 </div>
 
 <script>
-const VERSION='2026.08.18c';   // súbela cada vez que edites el archivo
+const VERSION='2026.08.28';   // súbela cada vez que edites el archivo
 const KEY='bolsillos_m2';
 const ING={B1:727041,B2:436225,B3:290086};
 const CATS=[
@@ -562,14 +563,53 @@ function dias(d){const n=new Date(),y=n.getFullYear(),m=n.getMonth();
   let t=new Date(y,m,d);if(t<=n)t=new Date(y,m+1,d);
   return Math.max(0,Math.ceil((t-n)/86400000))}
 
-/* días hasta la próxima quincena (15 o último día del mes) */
-function diasQuincena(){
-  const n=new Date(),d=n.getDate();
-  const ult=new Date(n.getFullYear(),n.getMonth()+1,0).getDate();
-  if(d<15)return 15-d;
-  if(d<ult)return ult-d;
-  return 15+(new Date(n.getFullYear(),n.getMonth()+2,0).getDate()-ult);
+/* ---------- calendario de pago de la empresa ----------
+   Paga el 15 y el 30. Nunca el 31: en meses de 31 días igual paga el 30.
+   Si esa fecha cae sábado, domingo o festivo, se corre al día hábil anterior.
+   Los festivos colombianos se calculan por regla (Ley Emiliani + Pascua),
+   así que esto funciona para cualquier año sin mantener listas. */
+const _FEST={};
+const ds=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+function pascua(y){
+  const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,
+        f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),
+        h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,
+        l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),
+        M=Math.floor((h+l-7*m+114)/31),D=((h+l-7*m+114)%31)+1;
+  return new Date(y,M-1,D);
 }
+function festivos(y){
+  if(_FEST[y])return _FEST[y];
+  const F=new Set(), sum=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x},
+        lun=d=>{const x=new Date(d),w=x.getDay();if(w!==1)x.setDate(x.getDate()+((8-w)%7));return x};
+  [[0,1],[4,1],[6,20],[7,7],[11,8],[11,25]].forEach(([m,d])=>F.add(ds(new Date(y,m,d))));
+  [[0,6],[2,19],[5,29],[7,15],[9,12],[10,1],[10,11]].forEach(([m,d])=>F.add(ds(lun(new Date(y,m,d)))));
+  const P=pascua(y);
+  F.add(ds(sum(P,-3)));F.add(ds(sum(P,-2)));            // Jueves y Viernes Santo
+  [43,64,71].forEach(n=>F.add(ds(lun(sum(P,n)))));      // Ascensión, Corpus, Sagrado Corazón
+  return _FEST[y]=F;
+}
+function esHabil(d){const w=d.getDay();return w!==0&&w!==6&&!festivos(d.getFullYear()).has(ds(d))}
+/* q=0 → quincena del 15 · q=1 → quincena del 30 */
+function pagoDe(y,m,q){
+  const ult=new Date(y,m+1,0).getDate();
+  const nominal=new Date(y,m,q===0?15:Math.min(30,ult));
+  const real=new Date(nominal);
+  while(!esHabil(real))real.setDate(real.getDate()-1);
+  return {real,nominal,movido:ds(real)!==ds(nominal)};
+}
+function proximoPago(){
+  const n=new Date();n.setHours(0,0,0,0);
+  for(let k=0;k<4;k++){
+    const y=n.getFullYear(), m=n.getMonth()+Math.floor(k/2), q=k%2;
+    const p=pagoDe(y,m,q);
+    if(p.real>n)return Object.assign(p,{dias:Math.round((p.real-n)/86400000)});
+  }
+  const p=pagoDe(n.getFullYear(),n.getMonth()+2,0);
+  return Object.assign(p,{dias:Math.round((p.real-n)/86400000)});
+}
+function diasQuincena(){return Math.max(1,proximoPago().dias)}
+const fechaLarga=d=>d.toLocaleDateString('es-CO',{weekday:'long',day:'numeric',month:'long'});
 /* período de quincena, para no aplicarla dos veces */
 function periodoQ(f){const p=f.split('-');return p[0]+'-'+p[1]+'-'+(+p[2]<15?'A':'B')}
 
@@ -1540,11 +1580,22 @@ function proximoEvento(){
   return mejor;
 }
 function calendario(){
-  const n=new Date(),ev=[];
-  const add=(d,t,s,a)=>ev.push({d,t,s,a});
-  const ult=new Date(n.getFullYear(),n.getMonth()+1,0).getDate();
-  add(dias(15),'Quincena + corte tarjeta','Aplica ingreso y paga la TC completa','+'+fmt(ING.B1+ING.B2+ING.B3));
-  add(dias(ult),'Quincena','Segundo pago del mes','+'+fmt(ING.B1+ING.B2+ING.B3));
+  const n=new Date();n.setHours(0,0,0,0);
+  const ev=[];
+  const add=(d,t,s,a)=>{if(d>=0)ev.push({d,t,s,a})};
+  /* los dos próximos pagos reales, ya corridos por fin de semana o festivo */
+  let puestos=0;
+  for(let k=0;k<5&&puestos<2;k++){
+    const p=pagoDe(n.getFullYear(),n.getMonth()+Math.floor(k/2),k%2);
+    if(p.real<=n)continue;
+    const d=Math.round((p.real-n)/86400000);
+    add(d,'Quincena',p.movido
+      ? 'Se corrió del '+p.nominal.getDate()+' porque cayó '+
+        (p.nominal.getDay()===0?'domingo':p.nominal.getDay()===6?'sábado':'festivo')
+      : 'Pago de nómina','+'+fmt(ING.B1+ING.B2+ING.B3));
+    puestos++;
+  }
+  add(dias(S.tc.corte),'Corte tarjeta','Después de esta fecha ganas 47 días sin intereses','');
   if(S.tc.saldo>0)add(dias(S.tc.pago),'Vence pago tarjeta','Paga el total, nunca el mínimo','−'+fmt(S.tc.saldo));
   if(S.deuda.pagadas<S.deuda.total)add(dias(5),'Cuota suegra','Cuota '+(S.deuda.pagadas+1)+' de '+S.deuda.total,'−'+fmt(S.deuda.cuota));
   const pe=proximoEvento();
@@ -1569,6 +1620,11 @@ function pintar(){
   document.getElementById('ver').textContent=VERSION;
   document.getElementById('nmovs').textContent=S.movs.length;
   document.getElementById('lastQ').textContent=S.lastQ||'nunca';
+  const P=proximoPago();
+  document.getElementById('q-prox').innerHTML=
+    `<div class="alert ${P.dias<=1?'ok':'info'}"><b>Próximo pago: ${fechaLarga(P.real)}</b> (en ${P.dias} día${P.dias===1?'':'s'}).${
+      P.movido?` Se corrió del ${P.nominal.getDate()} porque cayó ${
+        P.nominal.getDay()===0?'domingo':P.nominal.getDay()===6?'sábado':'festivo'}.`:''}</div>`;
   document.getElementById('hoyF').textContent=new Date().toLocaleDateString('es-CO',{weekday:'long',day:'numeric',month:'long'});
 
   /* HERO — el número que decide el comportamiento */
@@ -1582,8 +1638,9 @@ function pintar(){
   document.getElementById('h-libre').textContent=fmt(libre);
   document.getElementById('h-comp').textContent=fmt(comp);
   document.getElementById('h-racha').textContent=racha()+'d';
+  const PP=proximoPago();
   document.getElementById('h-sub').textContent=libre>0
-    ?`quedan ${dq} día${dq===1?'':'s'} para la quincena`
+    ?`pagan el ${PP.real.getDate()} de ${PP.real.toLocaleDateString('es-CO',{month:'long'})} · ${dq} día${dq===1?'':'s'}`
     :`comprometido ${fmt(-libre)} por encima de tu efectivo`;
 
   document.getElementById('favs').innerHTML=favoritos().map(f=>
