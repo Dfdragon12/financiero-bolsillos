@@ -8,6 +8,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Bolsillos">
 <meta name="theme-color" content="#1f1e1c">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAYAAAA9zQYyAAADQUlEQVR42u3dsU0cQRTH4Z0RBVwBCDpBcglUQEJGSB2Ezpy4AkpAcid3ugKuA8iRZYF3dmbe2+8rYA+df/772YG3LJO4vbl+XwjreDqXGX6OImAyBV5ETKa4i4jJFHcRMpnCLkImU9hVzIzUupkiZDKtdRUzmda6iplMURchk+kEqWIm01pXMZMp6ipmMkVdfV1kUlv/DoGRK13FTKaoq5jJFLUbmn3c0NaZiCtdxUymqJ0c5D45rDORV9pCk3ehrTPRV9pCk/uGhhRBOzfIcHZYaJwcMHXQzg2ynB0WGicHCBo6KO5nLDQIGgQNgkbQIGgQNAgaBI2gQdAgaBA0CBpBg6BB0CBoEDSCBkGDoEHQIGgEDYIGQYOgQdAIGgQNggZBg6ARNAga+ria7Qc63D83e9bl9cWv8M5M8xasliEL28mRNuYez0fQ3WMTtaDTRSZqQYOgZ15LKy1oEDQIGgQNgkbQIGgQNAgaBI2gQdAgaPi2K1/Bek93v5o96+efR1+ooOOH/PmZwnZyhI+55/MFTffYRC3odJGJWtAImpnX0koLGkFDfP4deqcODz+aPevy+03QxA/58zNnCNvJIeYwzxc03WMbHbWgxZwqakGTiqCtc6rPFTQWGgQNggZBI2gQNAgaBA2CRtAgaBA0CBoEjaBB0CBoEDQIGkGDoEHQIGgQNIIGQYOgQdAgaATd2OX1Jdznjnqh/JrPHfXek1Gfa6Gx0FFXusXn9V7pFp/Xey1Hvg1r+EL3irrl5/SKuuXn9Ips9Kvdpjg5to56i+dvHfUWz986thneU1hub67fZ7qBDvfP4da/5cvle61/1jfJThc0hD85QNDwt6CPp3PxNZDB8XQuFhonBwgaegXtjibD/WyhcXJAiKCdHUQ/Nyw0Tg4IE7Szg8jnhoUm/8lhpYm6zhaaffyl0EoTcZ3/udCiJlrMTg72cXJYaSKu85cWWtREifnLJ4eoiRCzG5p93dBWmkjr/O2FFjUzx/xfJ4eomTXmZVmWVXH6b8SYJeQmfym01swU8+qgRc1MMa8+OZwgzBJys4W21szUzGYBWmtGjN/miypsev4p3vVEELeItzbs5hW3iFMFLXABb+EDSsAlFOl5JioAAAAASUVORK5CYII=">
 <title>Bolsillos</title>
 <style>
@@ -264,11 +267,21 @@ tr:last-child td{border-bottom:0}
       <p class="mini">Límite sano: 30% del cupo = $1.800.000. Mejor día para comprar: el 16 (47 días sin intereses).</p>
     </div>
     <div class="card">
+      <h2>Subir extracto</h2>
+      <button class="wide" onclick="document.getElementById('extracto').click()">📄 Subir extracto de la tarjeta</button>
+      <input type="file" id="extracto" accept="image/*,application/pdf" style="display:none" onchange="procesarExtracto(this)">
+      <p class="mini">Foto o PDF. Leo cada compra con su fecha real y te digo de qué bolsillo debe salir. Tú confirmas antes de que se registre.</p>
+    </div>
+    <div class="card">
+      <h2>De dónde sale el pago</h2>
+      <div id="tc-reparto"></div>
+    </div>
+    <div class="card">
       <h2>Pagar tarjeta</h2>
       <div class="f"><label>Monto</label><input id="tcm" type="text" inputmode="numeric" placeholder="$0"></div>
       <div class="f"><label>Desde</label><select id="tcs"><option value="B1">Bolsillo 1</option><option value="B2">Bolsillo 2</option></select></div>
-      <button class="wide" onclick="pagarTC()">Registrar pago</button>
-      <button class="ghost wide sm" style="margin-top:9px" onclick="pagarTCTotal()">Pagar el total</button>
+      <button class="wide" onclick="pagarTCTotal()">Pagar el total (repartido)</button>
+      <button class="ghost wide sm" style="margin-top:9px" onclick="pagarTC()">Pago parcial desde un solo bolsillo</button>
     </div>
     <div class="card">
       <h2>Reglas</h2>
@@ -280,6 +293,17 @@ tr:last-child td{border-bottom:0}
 
   <!-- DEUDAS -->
   <section id="s-deuda">
+    <div class="card">
+      <h2>Patrimonio</h2>
+      <table id="pat-t"></table>
+      <div class="kpi" style="margin-top:13px">
+        <div>Líquido total<b id="pat-liq">—</b></div>
+        <div>Neto tras deudas<b id="pat-net">—</b></div>
+        <div>Colchón disponible<b id="pat-col">—</b></div>
+        <div>Rinde al año<b id="pat-rend">—</b></div>
+      </div>
+      <div id="pat-av" style="margin-top:12px"></div>
+    </div>
     <div class="card">
       <h2>Lista de deseos</h2>
       <div class="row" style="gap:7px">
@@ -361,6 +385,12 @@ tr:last-child td{border-bottom:0}
       <div class="f"><label>Saldo tarjeta de crédito</label><input id="ct" type="text" inputmode="numeric" onchange="setSaldos()"></div>
     </div>
     <div class="card">
+      <h2>FESERACIS · 3,4% E.A.</h2>
+      <div class="f"><label>Aportes sociales (bloqueado)</label><input id="fa" type="text" inputmode="numeric" onchange="setFes()"></div>
+      <div class="f"><label>Ahorro programado (disponible)</label><input id="fp" type="text" inputmode="numeric" onchange="setFes()"></div>
+      <p class="mini">Los aportes solo te los devuelven al retirarte del fondo. El ahorro programado sí puedes moverlo. Si tengo los dos al revés, cámbialos aquí.</p>
+    </div>
+    <div class="card">
       <h2>Lectura de facturas</h2>
       <div class="f"><label>API key de Claude</label>
         <input id="ck" type="password" placeholder="sk-ant-..." onchange="setKey()"></div>
@@ -383,6 +413,15 @@ tr:last-child td{border-bottom:0}
         <button class="sm ghost" style="color:var(--bad)" onclick="reset()">Reiniciar</button>
       </div>
     </div>
+    <div class="card">
+      <h2>Versión</h2>
+      <div class="kpi">
+        <div>Instalada<b id="ver">—</b></div>
+        <div>Movimientos<b id="nmovs">—</b></div>
+      </div>
+      <button class="wide sm" style="margin-top:12px" onclick="buscarUpdate()">Buscar actualización</button>
+      <p class="mini">Si acabas de subir cambios a GitHub y no los ves, toca este botón. Antes sincroniza, para no perder nada.</p>
+    </div>
   </section>
 </div>
 
@@ -402,6 +441,7 @@ tr:last-child td{border-bottom:0}
     <h1 style="font-size:17px;margin:0 0 3px">Editar movimiento</h1>
     <p class="mini" style="margin:0 0 14px" id="ed-info"></p>
     <div class="f"><label>Valor</label><input id="ed-val" type="text" inputmode="numeric" oninput="fmtIn(this)"></div>
+    <div class="f"><label>Fecha</label><input id="ed-fecha" type="date"></div>
     <div class="f"><label>Nota</label><input id="ed-nota"></div>
     <div class="f"><label>Categoría</label><div class="chips" id="ed-cat"></div></div>
     <div class="f"><label>Bolsillo</label><div class="chips" id="ed-src"></div></div>
@@ -450,6 +490,10 @@ tr:last-child td{border-bottom:0}
     <div class="f"><label>Categoría</label><div class="chips" id="a-cat"></div></div>
     <div class="f"><label>Juicio</label><div class="chips" id="a-nec"></div></div>
     <div class="f"><label>Nota</label><input id="a-nota" placeholder="opcional"></div>
+    <div class="f"><label>Fecha</label>
+      <div class="chips" id="a-fchips" style="margin-bottom:7px"></div>
+      <input id="a-fecha" type="date"></div>
+    <div class="f" id="a-destw" style="display:none"><label>¿Qué bolsillo lo paga?</label><div class="chips" id="a-dest"></div></div>
     <button class="wide" onclick="guardar()">Guardar gasto</button>
     <div class="row" style="margin-top:9px">
       <button class="ghost sm" style="flex:1" onclick="guardar(true)">Es un ingreso</button>
@@ -459,6 +503,7 @@ tr:last-child td{border-bottom:0}
 </div>
 
 <script>
+const VERSION='2026.08.18c';   // súbela cada vez que edites el archivo
 const KEY='bolsillos_m2';
 const ING={B1:727041,B2:436225,B3:290086};
 const CATS=[
@@ -475,6 +520,8 @@ const CATS=[
 ];
 const BUD={'Alimentación':450000,'Transporte':500000,'Salud':200000,'Deporte':240000,'Ocio':250000,'Regalos':200000,'Deudas':303297,'Otros':150000};
 const ICE={cap:131467367.59,i:0.1367/12,cuota:1746608.2};
+const TASAS={nu:0.093,fes:0.034,ipc:0.052,ice:0.145599};
+const ESENCIAL=1150000;   // alimentación + transporte + salud al mes
 const SEED=[['Parqueadero',5000,'B1'],['Comida',18000,'B1'],['Peaje',12000,'B1'],
             ['TuLlave',3200,'B1'],['Gasolina',60000,'B1'],['Restaurante',45000,'B2']];
 // eventos de pareja: [mes(0-11), día, nombre, costo estimado]
@@ -491,6 +538,7 @@ function cargar(){
     tc:{cupo:6000000,saldo:823837,corte:15,pago:2},
     deuda:{cuota:303297,total:6,pagadas:0},
     fondo:{saldo:0,meta:3019782,aporte:100000},
+    fes:{aportes:1613091,prog:709611},
     deseos:[], borrados:[], tumbas:[], url:'', apiKey:'', lastQ:null
   },d);
 }
@@ -535,9 +583,16 @@ function openAdd(pre){
   document.getElementById('ov').classList.add('show');
   document.getElementById('a-val').value=pre&&pre.val?'$'+pre.val.toLocaleString('es-CO'):'';
   document.getElementById('a-nota').value='';
-  sel={cat:(pre&&pre.cat)||'Comida',src:(pre&&pre.src)||'B1',nec:'auto'};chips();
+  sel={cat:(pre&&pre.cat)||'Comida',src:(pre&&pre.src)||'B1',nec:'auto',f:hoy(),dest:null};
+  chips();
   if(!pre)setTimeout(()=>document.getElementById('a-val').focus(),120);
 }
+/* atajos de fecha: para cuando registras gastos de días pasados */
+function diaRel(n){
+  const d=new Date();d.setDate(d.getDate()+n);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function setFecha(f){sel.f=f;document.getElementById('a-fecha').value=f;chips()}
 function closeAdd(){document.getElementById('ov').classList.remove('show')}
 function fmtIn(el){const n=num(el.value);el.value=n?'$'+n.toLocaleString('es-CO'):''}
 function chips(){
@@ -549,6 +604,21 @@ function chips(){
   document.getElementById('a-nec').innerHTML=
     [['auto','Auto ('+(cinfo(sel.cat)[2]==='nec'?'necesario':'evitable')+')'],['nec','Necesario'],['evi','Evitable']]
     .map(([v,l])=>`<div class="chip ${sel.nec===v?'on':''}" onclick="sel.nec='${v}';chips()">${l}</div>`).join('');
+  // fecha
+  if(!sel.f)sel.f=hoy();
+  document.getElementById('a-fecha').value=sel.f;
+  document.getElementById('a-fchips').innerHTML=
+    [[0,'Hoy'],[-1,'Ayer'],[-2,'Anteayer']].map(([n,l])=>{
+      const f=diaRel(n);
+      return `<div class="chip ${sel.f===f?'on':''}" onclick="setFecha('${f}')">${l}</div>`}).join('');
+  // si va a la tarjeta, hay que decidir qué bolsillo la pagará
+  const w=document.getElementById('a-destw');
+  if(sel.src==='TC'){
+    w.style.display='block';
+    if(!sel.dest)sel.dest=cinfo(sel.cat)[3];
+    document.getElementById('a-dest').innerHTML=[['B1','Bolsillo 1'],['B2','Bolsillo 2']].map(([v,l])=>
+      `<div class="chip ${sel.dest===v?'on':''}" onclick="sel.dest='${v}';chips()">${l}</div>`).join('');
+  } else w.style.display='none';
 }
 function pickCat(c){sel.cat=c;if(sel.src!=='TC')sel.src=cinfo(c)[3];chips()}
 
@@ -609,15 +679,73 @@ function comprimir(file,max=1400,q=0.72){
   });
 }
 
-async function leerFactura(b64){
+function leerFactura(b64){
+  return llamarClaude([{type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},
+                       {type:'text',text:PROMPT_FACTURA}]);
+}
+
+const PROMPT_EXTRACTO=`Este es un extracto de tarjeta de crédito de Colombia. Devuelve SOLO un objeto JSON, sin texto alrededor ni bloques de código.
+
+Formato exacto:
+{"comercio":"Banco de Occidente","fecha":null,"total":123456,"items":[{"desc":"comercio de la compra","f":"YYYY-MM-DD","val":12345,"cat":"Categoria","src":"TC","dest":"B1"}]}
+
+Reglas:
+- Extrae CADA transacción con su FECHA REAL del extracto. Ese es el punto principal: no uses la fecha de hoy.
+- Si el extracto muestra la fecha como DD/MM o DD-MMM, complétala con el año del periodo del extracto.
+- Valores en pesos colombianos como enteros, sin puntos ni símbolos. "12.500" es 12500. Ignora centavos.
+- Incluye solo COMPRAS. Ignora pagos recibidos, abonos, intereses, cuotas de manejo y saldos anteriores.
+- "total" = el total de compras del periodo (no el saldo total a pagar).
+- "cat" debe ser EXACTAMENTE una de: Comida, Transporte, Parqueadero, Gasolina, Peaje, GoPass, TuLlave, Farmacia, Salud, Psicólogo, Deporte, Ocio, Restaurante, Starbucks, Eventos, Regalos, Compras, Pagos
+- "src" siempre es "TC".
+- "dest" es el bolsillo que DEBE pagar esa compra, y solo puede ser "B1" o "B2":
+  · B1 = necesidades: mercado, transporte, gasolina, peajes, parqueaderos, medicamentos, salud, servicios.
+  · B2 = gustos: restaurantes, licor, cine, ropa, tecnología, regalos, suscripciones de entretenimiento, viajes de placer.
+- Usa el nombre del comercio para decidir. Si no lo reconoces, asume B2 (es más conservador para el presupuesto).`;
+
+async function procesarExtracto(input){
+  const f=input.files&&input.files[0];input.value='';
+  if(!f)return;
+  if(!S.apiKey){alert('Primero pega tu API key de Claude en Ajustes → Lectura de facturas.');go('conf');return}
+  document.getElementById('ovf').classList.add('show');
+  document.getElementById('fx-body').style.display='none';
+  document.getElementById('fx-load').style.display='block';
+  try{
+    const esPDF=f.type==='application/pdf'||/\.pdf$/i.test(f.name);
+    document.getElementById('fx-lt').textContent='Preparando el extracto…';
+    let contenido;
+    if(esPDF){
+      const b=await new Promise((res,rej)=>{const fr=new FileReader();
+        fr.onload=()=>res(fr.result.split(',')[1]);fr.onerror=rej;fr.readAsDataURL(f)});
+      contenido={type:'document',source:{type:'base64',media_type:'application/pdf',data:b}};
+    }else{
+      contenido={type:'image',source:{type:'base64',media_type:'image/jpeg',data:await comprimir(f,1800,0.8)}};
+    }
+    document.getElementById('fx-lt').textContent='Leyendo las transacciones…';
+    const r=await llamarClaude([contenido,{type:'text',text:PROMPT_EXTRACTO}],3000);
+    FX.comercio=r.comercio||'Extracto tarjeta';FX.total=+r.total||0;FX.fecha=hoy();FX.modo='extracto';
+    const items=(r.items||[]).map(i=>({
+      desc:String(i.desc||'').slice(0,60),
+      val:Math.abs(Math.round(+i.val||0)),
+      cat:cinfo(i.cat)[0]===i.cat?i.cat:'Compras',
+      src:'TC',
+      dest:i.dest==='B1'?'B1':'B2',
+      f:/^\d{4}-\d{2}-\d{2}$/.test(i.f)?i.f:hoy()
+    })).filter(i=>i.val>0);
+    if(!items.length)throw new Error('No encontré transacciones en el documento.');
+    abrirFactura(items);
+  }catch(e){
+    cerrarFactura();
+    alert('No pude leer el extracto.\n\n'+e.message+'\n\nPuedes registrarlas a mano.');
+  }
+}
+
+async function llamarClaude(content,maxTok){
   const r=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
     headers:{'content-type':'application/json','x-api-key':S.apiKey,
       'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:2000,
-      messages:[{role:'user',content:[
-        {type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},
-        {type:'text',text:PROMPT_FACTURA}]}]})
+    body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:maxTok||2000,
+      messages:[{role:'user',content}]})
   });
   if(!r.ok){
     const t=await r.text();
@@ -647,7 +775,8 @@ async function procesarFoto(input){
     const b64=await comprimir(f);
     document.getElementById('fx-lt').textContent='Leyendo la factura…';
     const r=await leerFactura(b64);
-    FX.comercio=r.comercio||'';FX.total=+r.total||0;FX.fecha=r.fecha||hoy();
+    FX.comercio=r.comercio||'';FX.total=+r.total||0;FX.modo='factura';
+    FX.fecha=/^\d{4}-\d{2}-\d{2}$/.test(r.fecha)?r.fecha:hoy();
     abrirFactura((r.items||[]).map(i=>({
       desc:String(i.desc||'').slice(0,60),
       val:Math.abs(Math.round(+i.val||0)),
@@ -666,8 +795,9 @@ async function procesarFoto(input){
 }
 
 function abrirFactura(items){
-  FX.items=items&&items.length?items:[{desc:'',val:0,cat:'Comida',src:'B1'}];
-  if(!items||!items.length){FX.comercio='';FX.total=0;FX.fecha=hoy()}
+  FX.items=items&&items.length?items:[{desc:'',val:0,cat:'Comida',src:'B1',f:hoy()}];
+  if(!items||!items.length){FX.comercio='';FX.total=0;FX.fecha=hoy();FX.modo='factura'}
+  FX.items.forEach(i=>{if(!i.f)i.f=FX.fecha||hoy()});
   document.getElementById('ovf').classList.add('show');
   document.getElementById('fx-load').style.display='none';
   document.getElementById('fx-body').style.display='block';
@@ -676,7 +806,8 @@ function abrirFactura(items){
   fxPintar();
 }
 function cerrarFactura(){document.getElementById('ovf').classList.remove('show')}
-function fxAdd(){FX.items.push({desc:'',val:0,cat:'Comida',src:'B1'});fxPintar()}
+function fxAdd(){FX.items.push({desc:'',val:0,cat:'Comida',src:FX.modo==='extracto'?'TC':'B1',
+  dest:'B2',f:FX.fecha||hoy()});fxPintar()}
 function fxDel(i){FX.items.splice(i,1);if(!FX.items.length)fxAdd();else fxPintar()}
 function fxSet(i,campo,v){
   if(campo==='val')FX.items[i].val=num(v);
@@ -698,10 +829,17 @@ function fxPintar(){
         <select style="flex:2;padding:9px" onchange="fxSet(${i},'cat',this.value)">
           ${opc.map(c=>`<option ${c===it.cat?'selected':''}>${c}</option>`).join('')}
         </select>
-        <select style="flex:1;min-width:88px;padding:9px" onchange="fxSet(${i},'src',this.value)">
+        <select style="flex:1;min-width:82px;padding:9px" onchange="fxSet(${i},'src',this.value)">
           ${['B1','B2','TC'].map(s=>`<option ${s===it.src?'selected':''}>${s}</option>`).join('')}
         </select>
         <button class="sm ghost" style="color:var(--bad);padding:9px 12px" onclick="fxDel(${i})">✕</button>
+      </div>
+      <div class="row" style="gap:7px;margin-top:7px">
+        <input type="date" style="flex:1;min-width:130px;padding:9px" value="${it.f||''}"
+          onchange="fxSet(${i},'f',this.value)">
+        ${it.src==='TC'?`<select style="flex:1;min-width:120px;padding:9px" onchange="fxSet(${i},'dest',this.value)">
+          <option value="B1" ${it.dest==='B1'?'selected':''}>lo paga B1</option>
+          <option value="B2" ${it.dest!=='B1'?'selected':''}>lo paga B2</option></select>`:''}
       </div>
     </div>`).join('');
 
@@ -713,19 +851,27 @@ function fxPintar(){
   else if(Math.abs(suma-FX.total)<=2){cu.innerHTML='<span style="color:var(--ok)">✓ Cuadra con la factura.</span>'}
   else{cu.innerHTML=`<span style="color:var(--bad)">Diferencia de ${fmt(Math.abs(suma-FX.total))}. Ajusta las líneas antes de registrar.</span>`}
 
-  const porB={};FX.items.forEach(x=>porB[x.src]=(porB[x.src]||0)+x.val);
-  document.getElementById('fx-resumen').innerHTML=Object.keys(porB).length?
+  const porB={},porD={};
+  FX.items.forEach(x=>{porB[x.src]=(porB[x.src]||0)+x.val;
+    if(x.src==='TC')porD[x.dest||'B2']=(porD[x.dest||'B2']||0)+x.val});
+  let res=Object.keys(porB).length?
     `<div class="alert info" style="margin-bottom:10px">Se va a descontar: ${
       Object.entries(porB).map(([k,v])=>`<b>${fmt(v)}</b> de ${k==='TC'?'la tarjeta':'Bolsillo '+k.slice(1)}`).join(' · ')}</div>`:'';
+  if(Object.keys(porD).length)
+    res+=`<div class="alert warn" style="margin-bottom:10px">Cuando pagues la tarjeta, esto sale así: ${
+      Object.entries(porD).map(([k,v])=>`<b>${fmt(v)}</b> de Bolsillo ${k.slice(1)}`).join(' · ')}</div>`;
+  document.getElementById('fx-resumen').innerHTML=res;
 }
 function fxGuardar(){
   const val=FX.items.filter(x=>x.val>0);
   if(!val.length){alert('No hay líneas con valor.');return}
-  const f=/^\d{4}-\d{2}-\d{2}$/.test(FX.fecha)?FX.fecha:hoy();
   val.forEach(it=>{
-    const nota=[FX.comercio,it.desc].filter(Boolean).join(' · ').slice(0,80);
-    S.movs.push({id:uid(),f,ts:new Date().toISOString(),cat:it.cat,val:it.val,src:it.src,
-      nec:cinfo(it.cat)[2],nota,tipo:'gasto',sync:0});
+    const f=/^\d{4}-\d{2}-\d{2}$/.test(it.f)?it.f:(/^\d{4}-\d{2}-\d{2}$/.test(FX.fecha)?FX.fecha:hoy());
+    const nota=(FX.modo==='extracto'?it.desc:[FX.comercio,it.desc].filter(Boolean).join(' · ')).slice(0,80);
+    const m={id:uid(),f,ts:new Date().toISOString(),cat:it.cat,val:it.val,src:it.src,
+      nec:cinfo(it.cat)[2],nota,tipo:'gasto',sync:0};
+    if(it.src==='TC')m.dest=it.dest==='B1'?'B1':'B2';
+    S.movs.push(m);
     if(it.src==='TC')S.tc.saldo+=it.val;else S.saldos[it.src]-=it.val;
   });
   cerrarFactura();guardarLS();sync();
@@ -809,6 +955,47 @@ function pintarAnalisis(){
     : '<div class="empty">Sin movimientos en este periodo.</div>';
 }
 
+/* ---------- patrimonio ---------- */
+function setFes(){
+  S.fes.aportes=num(document.getElementById('fa').value);
+  S.fes.prog=num(document.getElementById('fp').value);
+  guardarLS();
+}
+function pintarPatrimonio(){
+  const F=S.fes||{aportes:0,prog:0};
+  const filas=[
+    ['Bolsillo 1 · día a día',S.saldos.B1,'AV Villas',''],
+    ['Bolsillo 2 · personal',S.saldos.B2,'AV Villas',''],
+    ['Bolsillo 3 · ahorro',S.saldos.B3,'Nu','9,30%'],
+    ['FESERACIS · programado',F.prog,'disponible','3,4%'],
+    ['FESERACIS · aportes',F.aportes,'bloqueado','3,4%']
+  ];
+  const liq=filas.reduce((a,f)=>a+f[1],0);
+  const deudas=S.tc.saldo+(S.deuda.total-S.deuda.pagadas)*S.deuda.cuota;
+  const colchon=S.saldos.B3+F.prog;                 // solo lo que puedes tocar de verdad
+  const rend=S.saldos.B3*TASAS.nu+(F.prog+F.aportes)*TASAS.fes;
+  document.getElementById('pat-t').innerHTML=filas.map(f=>
+    `<tr><td>${f[0]}<span style="display:block;font-size:11px;color:var(--muted)">${f[2]}${f[3]?' · '+f[3]:''}</span></td>
+     <td class="${f[1]<0?'neg':''}">${fmt(f[1])}</td></tr>`).join('');
+  document.getElementById('pat-liq').textContent=fmt(liq);
+  const net=document.getElementById('pat-net');
+  net.textContent=fmt(liq-deudas);net.classList.toggle('neg',liq-deudas<0);
+  document.getElementById('pat-col').textContent=(colchon/ESENCIAL).toFixed(1)+' meses';
+  document.getElementById('pat-rend').textContent=fmt(rend);
+
+  const av=[];
+  const realFes=((1+TASAS.fes)/(1+TASAS.ipc)-1);
+  if(F.prog+F.aportes>0)
+    av.push(['warn',`FESERACIS te da 3,4% con inflación de 5,2%: pierdes ${fmt(Math.abs((F.prog+F.aportes)*realFes))} de poder adquisitivo al año. Los aportes están bloqueados, pero el programado (${fmt(F.prog)}) sí lo puedes mover.`]);
+  if(F.prog>0)
+    av.push(['info',`Mover el ahorro programado a Nu te daría ${fmt(F.prog*(TASAS.nu-TASAS.fes))} más al año. Abonarlo al ICETEX, ${fmt(F.prog*(TASAS.ice-TASAS.fes))}.`]);
+  if(colchon/ESENCIAL<3)
+    av.push(['bad',`Tu colchón real cubre ${(colchon/ESENCIAL).toFixed(1)} meses de gastos esenciales. Por debajo de 3 estás expuesto.`]);
+  else
+    av.push(['ok',`Tu colchón cubre ${(colchon/ESENCIAL).toFixed(1)} meses de gastos esenciales (${fmt(ESENCIAL)}/mes). Sobre 3 meses estás en terreno sano.`]);
+  document.getElementById('pat-av').innerHTML=av.map(a=>`<div class="alert ${a[0]}">${a[1]}</div>`).join('');
+}
+
 /* ---------- lista de deseos ---------- */
 /* Capacidad medida del comportamiento real, no del presupuesto teórico */
 function capacidad(){
@@ -843,7 +1030,8 @@ function bloqueos(){
     b.push([ev.n+' en '+ev.d+' días',`El fondo tiene ${fmt(S.fondo.saldo)} de ${fmt(ev.c)}. Esto es lo que te llevó a pedirle prestado a tu suegra.`]);
   if(S.deuda.pagadas<S.deuda.total)
     b.push([`Debes ${S.deuda.total-S.deuda.pagadas} cuotas a tu suegra`,`${fmt((S.deuda.total-S.deuda.pagadas)*S.deuda.cuota)} pendientes. Se liberan $303.297/mes al terminar.`]);
-  if(S.saldos.B3<3560158)b.push(['Colchón por debajo de la base','B3 es tu única red. Repónlo antes de gastar por gusto.']);
+  const colchon=S.saldos.B3+((S.fes||{}).prog||0);
+  if(colchon<ESENCIAL*3)b.push(['Colchón bajo 3 meses',`Tienes ${fmt(colchon)} disponible = ${(colchon/ESENCIAL).toFixed(1)} meses de gastos esenciales. Repón antes de gastar por gusto.`]);
   if(S.saldos.B1<0||S.saldos.B2<0)b.push(['Bolsillo en sobregiro','Sal del rojo primero.']);
   return b;
 }
@@ -1036,14 +1224,17 @@ function guardar(esIngreso){
   if(val<=0){alert('Escribe un valor.');return}
   if(esIngreso&&sel.src==='TC'){alert('Un ingreso no entra a la tarjeta.');return}
   const nota=document.getElementById('a-nota').value.trim();
+  const fecha=document.getElementById('a-fecha').value||sel.f||hoy();
   let cat=sel.cat, src=sel.src, nec, razon='';
   if(esIngreso){cat='Ingreso';nec='nec'}
   else if(sel.nec==='auto'){
     const c=clasificar(sel.cat,nota,sel.src);
     cat=c.cat;src=c.src;nec=c.nec;razon=c.razon;
   } else nec=sel.nec;
-  const m={id:uid(),f:hoy(),ts:new Date().toISOString(),cat,val,src,nec,nota,
+  const m={id:uid(),f:fecha,ts:new Date().toISOString(),cat,val,src,nec,nota,
     tipo:esIngreso?'ingreso':'gasto',sync:0};
+  if(src==='TC')m.dest=sel.dest||cinfo(cat)[3];
+  if(fecha!==hoy())razon=(razon?razon+' ':'')+'Registrado con fecha '+fecha+'.';
   S.movs.push(m);
   if(esIngreso)S.saldos[src]+=val;
   else if(src==='TC')S.tc.saldo+=val;
@@ -1064,8 +1255,9 @@ let ED={id:null,cat:'Comida',src:'B1',nec:'nec'};
 function abrirEdit(id){
   const m=S.movs.find(x=>x.id===id);if(!m)return;
   if(m.tipo!=='gasto'){if(confirm('Este movimiento no es un gasto normal. ¿Borrarlo?'))borrar(id);return}
-  ED={id,cat:m.cat,src:m.src,nec:m.nec};
+  ED={id,cat:m.cat,src:m.src,nec:m.nec,dest:m.dest||cinfo(m.cat)[3]};
   document.getElementById('ed-val').value=fmt(m.val);
+  document.getElementById('ed-fecha').value=m.f;
   document.getElementById('ed-nota').value=m.nota||'';
   document.getElementById('ed-info').textContent=m.f+(m.sync?' · en la hoja':' · pendiente de enviar');
   edChips();
@@ -1076,7 +1268,10 @@ function edChips(){
   document.getElementById('ed-cat').innerHTML=CATS.map(c=>
     `<div class="chip ${ED.cat===c[0]?'on':''}" onclick="ED.cat='${c[0]}';ED.src=cinfo('${c[0]}')[3];ED.nec=cinfo('${c[0]}')[2];edChips()">${c[0]}</div>`).join('');
   document.getElementById('ed-src').innerHTML=[['B1','Bolsillo 1'],['B2','Bolsillo 2'],['TC','Tarjeta']].map(([v,l])=>
-    `<div class="chip ${ED.src===v?'on':''}" onclick="ED.src='${v}';edChips()">${l}</div>`).join('');
+    `<div class="chip ${ED.src===v?'on':''}" onclick="ED.src='${v}';edChips()">${l}</div>`).join('')
+    +(ED.src==='TC'?'<div style="width:100%;margin-top:8px;font-size:11.5px;color:var(--muted)">¿Qué bolsillo lo paga?</div>'
+      +[['B1','Paga B1'],['B2','Paga B2']].map(([v,l])=>
+      `<div class="chip ${ED.dest===v?'on':''}" onclick="ED.dest='${v}';edChips()">${l}</div>`).join(''):'');
   document.getElementById('ed-nec').innerHTML=[['nec','Necesario'],['evi','Evitable']].map(([v,l])=>
     `<div class="chip ${ED.nec===v?'on':''}" onclick="ED.nec='${v}';edChips()">${l}</div>`).join('');
 }
@@ -1086,9 +1281,12 @@ function edGuardar(){
   const val=num(document.getElementById('ed-val').value);
   if(val<=0){alert('El valor debe ser mayor a cero.');return}
   const nota=document.getElementById('ed-nota').value.trim();
-  const f=S.movs[i].f, ts=S.movs[i].ts;
+  const f=document.getElementById('ed-fecha').value||S.movs[i].f;
+  const ts=S.movs[i].ts;
   revertir(i);                                  // deshace el efecto viejo y lo saca de la hoja
-  S.movs.push({id:uid(),f,ts,cat:ED.cat,val,src:ED.src,nec:ED.nec,nota,tipo:'gasto',sync:0});
+  const m={id:uid(),f,ts,cat:ED.cat,val,src:ED.src,nec:ED.nec,nota,tipo:'gasto',sync:0};
+  if(ED.src==='TC')m.dest=ED.dest==='B1'?'B1':'B2';
+  S.movs.push(m);
   if(ED.src==='TC')S.tc.saldo+=val;else S.saldos[ED.src]-=val;
   cerrarEdit();guardarLS();sync();
 }
@@ -1102,17 +1300,58 @@ function revertir(i){
   colaBorrar(m);S.movs.splice(i,1);
   return m;
 }
+/* Reparte la deuda de la tarjeta entre los bolsillos que la originaron.
+   Cada compra con TC guarda su `dest`: el bolsillo al que le correspondía ese gasto. */
+function repartoTC(){
+  const pend=S.movs.filter(m=>m.src==='TC'&&m.tipo==='gasto'&&!m.pagadoTC);
+  const por={B1:0,B2:0};
+  pend.forEach(m=>{const d=(m.dest==='B2'||m.dest==='B1')?m.dest:cinfo(m.cat)[3];
+    por[d==='B2'?'B2':'B1']+=m.val});
+  const clasificado=por.B1+por.B2;
+  const resto=Math.max(0,S.tc.saldo-clasificado);   // deuda vieja sin movimientos detrás
+  return {B1:por.B1,B2:por.B2,resto,clasificado,pend};
+}
 function pagarTC(){
   const v=num(document.getElementById('tcm').value);
   if(v<=0){alert('Escribe el monto.');return}
   const s=document.getElementById('tcs').value;
   if(S.saldos[s]-v<0&&!confirm('Ese pago deja '+s+' en negativo. ¿Seguir?'))return;
-  S.tc.saldo=Math.max(0,S.tc.saldo-v);S.saldos[s]-=v;
-  S.movs.push({id:uid(),f:hoy(),ts:new Date().toISOString(),cat:'Pagos',val:v,src:s,nec:'nec',
-    nota:'Pago tarjeta de crédito',tipo:'pagoTC',sync:0});
+  aplicarPago([[s,v]]);
+}
+function pagarTCTotal(){
+  const R=repartoTC();
+  if(S.tc.saldo<=0){alert('La tarjeta está en $0.');return}
+  const partes=[];
+  if(R.B1>0)partes.push(['B1',R.B1]);
+  if(R.B2>0)partes.push(['B2',R.B2]);
+  if(R.resto>0)partes.push([document.getElementById('tcs').value||'B1',R.resto]);
+  if(!partes.length){document.getElementById('tcm').value=fmt(S.tc.saldo);pagarTC();return}
+  const suma={B1:0,B2:0};partes.forEach(([s,v])=>suma[s]+=v);
+  const rojo=Object.keys(suma).filter(k=>suma[k]>0&&S.saldos[k]-suma[k]<0);
+  const txt=partes.map(p=>`${fmt(p[1])} de Bolsillo ${p[0].slice(1)}`).join('\n');
+  const aviso=rojo.length
+    ? '\n\n⚠️ Esto deja en negativo: '+rojo.map(k=>'Bolsillo '+k.slice(1)+' en '+fmt(S.saldos[k]-suma[k])).join(', ')
+      +'\nConsidera un pago parcial y completar en la quincena.'
+    : '';
+  if(!confirm('Pago total de '+fmt(S.tc.saldo)+', repartido según de dónde salió cada compra:\n\n'+txt+aviso+'\n\n¿Confirmas?'))return;
+  aplicarPago(partes);
+}
+function aplicarPago(partes){
+  let total=0;
+  partes.forEach(([s,v])=>{
+    if(v<=0)return;
+    S.saldos[s]-=v;total+=v;
+    S.movs.push({id:uid(),f:hoy(),ts:new Date().toISOString(),cat:'Pagos',val:v,src:s,nec:'nec',
+      nota:'Pago tarjeta de crédito',tipo:'pagoTC',sync:0});
+  });
+  S.tc.saldo=Math.max(0,S.tc.saldo-total);
+  /* marca como pagadas las compras más viejas que alcance a cubrir el pago */
+  let rest=total;
+  S.movs.filter(m=>m.src==='TC'&&m.tipo==='gasto'&&!m.pagadoTC)
+    .sort((a,b)=>a.f<b.f?-1:1)
+    .forEach(m=>{if(rest>=m.val){m.pagadoTC=1;rest-=m.val}});
   document.getElementById('tcm').value='';guardarLS();sync();
 }
-function pagarTCTotal(){document.getElementById('tcm').value=fmt(S.tc.saldo);pagarTC()}
 function pagarCuota(){
   if(S.deuda.pagadas>=S.deuda.total){alert('Ya pagaste las 6. Libre.');return}
   const c=S.deuda.cuota;
@@ -1170,6 +1409,12 @@ function desdeAtajo(){
   guardarLS();sync();
 }
 function reset(){if(confirm('¿Reiniciar todo en este dispositivo?')){localStorage.removeItem(KEY);location.reload()}}
+/* iOS cachea fuerte las apps de pantalla de inicio. Cambiarle la URL la obliga a bajar el archivo de nuevo. */
+function buscarUpdate(){
+  const pend=S.movs.filter(m=>!m.sync).length;
+  if(pend&&!confirm('Tienes '+pend+' movimiento(s) sin sincronizar. ¿Recargar de todos modos?'))return;
+  location.replace(location.pathname+'?v='+Date.now());
+}
 function exportar(){
   const r=[['id','fecha','categoria','nota','fuente','juicio','tipo','valor']]
     .concat(S.movs.map(m=>[m.id,m.f,m.cat,(m.nota||'').replace(/[,\n]/g,' '),m.src,m.nec,m.tipo,m.val]));
@@ -1321,6 +1566,8 @@ function pintar(){
   document.getElementById('c3').value=fmt(s.B3);document.getElementById('ct').value=fmt(S.tc.saldo);
   document.getElementById('cu').value=S.url||'';
   document.getElementById('ck').value=S.apiKey||'';
+  document.getElementById('ver').textContent=VERSION;
+  document.getElementById('nmovs').textContent=S.movs.length;
   document.getElementById('lastQ').textContent=S.lastQ||'nunca';
   document.getElementById('hoyF').textContent=new Date().toLocaleDateString('es-CO',{weekday:'long',day:'numeric',month:'long'});
 
@@ -1387,6 +1634,17 @@ function pintar(){
   document.getElementById('tc-dias').textContent=dias(S.tc.pago)+' días';
   const tb=document.getElementById('tcbar'),u=S.tc.cupo?S.tc.saldo/S.tc.cupo*100:0;
   tb.style.width=Math.min(u,100)+'%';tb.className=u>50?'d':u>30?'w':'';
+  const R=repartoTC();
+  document.getElementById('tc-reparto').innerHTML = S.tc.saldo<=0
+    ? '<div class="alert ok">Tarjeta en $0. Así debe quedar cada mes.</div>'
+    : `<table>
+        <tr><td>Bolsillo 1 · necesidades</td><td>${fmt(R.B1)}</td></tr>
+        <tr><td>Bolsillo 2 · gustos</td><td>${fmt(R.B2)}</td></tr>
+        ${R.resto>0?`<tr><td>Sin clasificar<span style="display:block;font-size:11px;color:var(--muted)">deuda anterior sin detalle</span></td><td>${fmt(R.resto)}</td></tr>`:''}
+        <tr><td><b>Total a pagar</b></td><td><b>${fmt(S.tc.saldo)}</b></td></tr>
+      </table>
+      ${R.resto>0?`<div class="alert warn" style="margin-top:10px">${fmt(R.resto)} no tiene compras detrás. Sube el extracto y quedará repartido.</div>`
+        :'<div class="alert ok" style="margin-top:10px">Todo el saldo está clasificado. El botón de pago total lo reparte solo.</div>'}`;
 
   const D=S.deuda,pe2=(D.total-D.pagadas)*D.cuota;
   document.getElementById('d-c').textContent=fmt(D.cuota);
@@ -1407,7 +1665,9 @@ function pintar(){
     ?`<b>${ev.n}</b> en ${ev.d} días (~${fmt(ev.c)}). Tienes ${fmt(F.saldo)}. ${F.saldo>=ev.c?'Cubierto.':'Te faltan '+fmt(ev.c-F.saldo)+' — son '+fmt((ev.c-F.saldo)/Math.max(1,Math.ceil(ev.d/30)))+' al mes.'}`
     :'';
 
-  pintarUltimo();pintarAnalisis();pintarDeseos();
+  document.getElementById('fa').value=fmt((S.fes||{}).aportes||0);
+  document.getElementById('fp').value=fmt((S.fes||{}).prog||0);
+  pintarUltimo();pintarAnalisis();pintarPatrimonio();pintarDeseos();
   alertas(tm,evi,proy,presT,libre,comp,dq);calendario();pintarPend();simular();
 }
 function vv(id,v){const e=document.getElementById(id);e.textContent=fmt(v);e.classList.toggle('neg',v<0)}
