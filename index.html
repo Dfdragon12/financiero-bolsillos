@@ -293,6 +293,16 @@ tr:last-child td{border-bottom:0}
       <p class="mini">Foto o PDF. Leo cada compra con su fecha real y te digo de qué bolsillo debe salir. Tú confirmas antes de que se registre.</p>
     </div>
     <div class="card">
+      <h2>Estado del ciclo</h2>
+      <div class="row" style="gap:7px">
+        <div style="flex:1;min-width:130px"><label>Total del extracto</label>
+          <input id="tc-ext" type="text" inputmode="numeric" onchange="setExtracto()"></div>
+        <div style="flex:1;min-width:110px"><label>Pago mínimo</label>
+          <input id="tc-min" type="text" inputmode="numeric" onchange="setExtracto()"></div>
+      </div>
+      <div id="tc-ciclo" style="margin-top:13px"></div>
+    </div>
+    <div class="card">
       <h2>De dónde sale el pago</h2>
       <div id="tc-reparto"></div>
     </div>
@@ -524,7 +534,7 @@ tr:last-child td{border-bottom:0}
 </div>
 
 <script>
-const VERSION='2026.08.30';   // súbela cada vez que edites el archivo
+const VERSION='2026.09.01';   // súbela cada vez que edites el archivo
 const KEY='bolsillos_m2';
 const ING={B1:727041,B2:436225,B3:290086};
 const CATS=[
@@ -541,7 +551,7 @@ const CATS=[
 ];
 const BUD={'Alimentación':450000,'Transporte':500000,'Salud':200000,'Deporte':240000,'Ocio':250000,'Regalos':200000,'Deudas':303297,'Otros':150000};
 const ICE={cap:131467367.59,i:0.1367/12,cuota:1746608.2};
-const TASAS={nu:0.093,fes:0.034,ipc:0.052,ice:0.145599};
+const TASAS={nu:0.093,fes:0.034,ipc:0.052,ice:0.145599,usura:0.2966};
 const ESENCIAL=1150000;   // alimentación + transporte + salud al mes
 const SEED=[['Parqueadero',5000,'B1'],['Comida',18000,'B1'],['Peaje',12000,'B1'],
             ['TuLlave',3200,'B1'],['Gasolina',60000,'B1'],['Restaurante',45000,'B2']];
@@ -556,7 +566,7 @@ function cargar(){
   return Object.assign({
     saldos:{B1:439769,B2:310909,B3:3560158},
     movs:[],
-    tc:{cupo:6000000,saldo:823837,corte:15,pago:2},
+    tc:{cupo:6000000,saldo:823837,corte:15,pago:2,extracto:0,minimo:0},
     deuda:{cuota:303297,total:6,pagadas:0},
     fondo:{saldo:0,meta:3019782,aporte:100000},
     fes:{aportes:1613091,prog:709611},
@@ -1451,6 +1461,62 @@ function revertir(i){
   colaBorrar(m);S.movs.splice(i,1);
   return m;
 }
+/* ---------- estado del ciclo de la tarjeta ----------
+   Un ciclo va del corte (día 15) al vencimiento (día 2 del mes siguiente).
+   Cumplir el mínimo evita la mora, pero NO evita los intereses: son cosas
+   distintas y la app tiene que decirlo así. */
+function setExtracto(){
+  S.tc.extracto=num(document.getElementById('tc-ext').value);
+  S.tc.minimo=num(document.getElementById('tc-min').value);
+  guardarLS();
+}
+function ultimoCorte(){
+  const n=new Date();n.setHours(0,0,0,0);
+  let c=new Date(n.getFullYear(),n.getMonth(),S.tc.corte);
+  if(c>n)c=new Date(n.getFullYear(),n.getMonth()-1,S.tc.corte);
+  return ds(c);
+}
+function cicloTC(){
+  const desde=ultimoCorte();
+  const pagado=S.movs.filter(m=>m.tipo==='pagoTC'&&m.f>=desde).reduce((a,m)=>a+m.val,0);
+  const ext=S.tc.extracto||0, min=S.tc.minimo||0;
+  const dias_=dias(S.tc.pago);
+  let estado='sinDato';
+  if(ext>0){
+    if(pagado>=ext)estado='cubierto';
+    else if(min>0&&pagado>=min)estado='minimo';
+    else estado='pendiente';
+  }
+  const rotando=Math.max(0,ext-pagado);
+  const mensual=Math.pow(1+TASAS.usura,1/12)-1;
+  return {desde,pagado,ext,min,estado,rotando,dias:dias_,interes:rotando*mensual,falta:Math.max(0,min-pagado)};
+}
+function pintarCiclo(){
+  const C=cicloTC();
+  document.getElementById('tc-ext').value=fmt(S.tc.extracto||0);
+  document.getElementById('tc-min').value=fmt(S.tc.minimo||0);
+  const box=document.getElementById('tc-ciclo');
+  const base=`<div class="mini" style="margin-top:9px">Ciclo desde el corte del ${C.desde}. Pagado en este ciclo: <b>${fmt(C.pagado)}</b>.</div>`;
+  if(C.estado==='sinDato'){
+    box.innerHTML=`<div class="alert info">Escribe el total y el mínimo de tu último extracto. Con eso dejo de insistirte cuando ya hayas pagado.</div>`+base;
+    return;
+  }
+  if(C.estado==='cubierto'){
+    box.innerHTML=`<div class="alert ok"><b>Ciclo cubierto.</b> Pagaste ${fmt(C.pagado)} de ${fmt(C.ext)}. No debes nada el día ${S.tc.pago} y no vas a pagar un peso de intereses. Así es como se usa la tarjeta.</div>`+base;
+    return;
+  }
+  if(C.estado==='minimo'){
+    box.innerHTML=`<div class="alert warn"><b>Mínimo cumplido: sin mora.</b> Pagaste ${fmt(C.pagado)} de ${fmt(C.ext)}.
+      El banco no te va a cobrar mora ni reportar, así que el día ${S.tc.pago} puedes estar tranquilo.
+      <br><br><b>Pero quedan ${fmt(C.rotando)} rotando</b> y eso sí genera intereses: alrededor de <b>${fmt(C.interes)} este mes</b>
+      (estimado al techo legal de 29,66% E.A.). Si puedes, abona antes del día ${S.tc.pago} — puedes pagar cualquier día, no solo el del vencimiento.</div>`+base;
+    return;
+  }
+  box.innerHTML=`<div class="alert bad"><b>Falta el pago.</b> Llevas ${fmt(C.pagado)} de un extracto de ${fmt(C.ext)}.
+    ${C.falta>0?`Te faltan <b>${fmt(C.falta)}</b> para el mínimo`:'Ya cubriste el mínimo'} y vencen en <b>${C.dias} día${C.dias===1?'':'s'}</b>.
+    Lo ideal es el total: ${fmt(C.ext)}.</div>`+base;
+}
+
 /* Reparte la deuda de la tarjeta entre los bolsillos que la originaron.
    Cada compra con TC guarda su `dest`: el bolsillo al que le correspondía ese gasto. */
 function repartoTC(){
@@ -1707,7 +1773,15 @@ function calendario(){
     puestos++;
   }
   add(dias(S.tc.corte),'Corte tarjeta','Después de esta fecha ganas 47 días sin intereses','');
-  if(S.tc.saldo>0)add(dias(S.tc.pago),'Vence pago tarjeta','Paga el total, nunca el mínimo','−'+fmt(S.tc.saldo));
+  const CC=cicloTC();
+  if(CC.estado==='cubierto')
+    add(dias(S.tc.pago),'Vence pago tarjeta','Ya pagaste el ciclo completo. Nada que hacer','✓');
+  else if(CC.estado==='minimo')
+    add(dias(S.tc.pago),'Vence pago tarjeta','Mínimo cumplido. Abonar lo que puedas evita intereses','−'+fmt(CC.rotando));
+  else if(CC.estado==='pendiente')
+    add(dias(S.tc.pago),'Vence pago tarjeta',`Faltan ${fmt(CC.falta)} para el mínimo`,'−'+fmt(CC.ext-CC.pagado));
+  else if(S.tc.saldo>0)
+    add(dias(S.tc.pago),'Vence pago tarjeta','Paga el total, nunca el mínimo','−'+fmt(S.tc.saldo));
   if(S.deuda.pagadas<S.deuda.total)add(dias(5),'Cuota suegra','Cuota '+(S.deuda.pagadas+1)+' de '+S.deuda.total,'−'+fmt(S.deuda.cuota));
   const pe=proximoEvento();
   if(pe)add(pe.d,pe.n,'Cubre con el fondo de fechas especiales','~'+fmt(pe.c));
@@ -1802,6 +1876,7 @@ function pintar(){
   document.getElementById('tc-dias').textContent=dias(S.tc.pago)+' días';
   const tb=document.getElementById('tcbar'),u=S.tc.cupo?S.tc.saldo/S.tc.cupo*100:0;
   tb.style.width=Math.min(u,100)+'%';tb.className=u>50?'d':u>30?'w':'';
+  pintarCiclo();
   const R=repartoTC();
   document.getElementById('tc-reparto').innerHTML = S.tc.saldo<=0
     ? '<div class="alert ok">Tarjeta en $0. Así debe quedar cada mes.</div>'
@@ -1859,6 +1934,15 @@ function alertas(tm,evi,proy,presT,libre,comp,dq){
   else if(s.B2<100000)A.push(['warn',`B2 casi en cero (${fmt(s.B2)}) y faltan ${dq} días para la quincena.`]);
   if(s.B3<3560158)A.push(['warn','B3 bajó de su base. Es tu único colchón: solo emergencias reales.']);
   if(S.tc.cupo&&S.tc.saldo/S.tc.cupo>0.3)A.push(['warn',`Usas ${(S.tc.saldo/S.tc.cupo*100).toFixed(0)}% del cupo. Máximo sano: 30%.`]);
+  const C=cicloTC();
+  if(C.estado==='cubierto')
+    A.push(['ok',`Tarjeta del ciclo cubierta: pagaste ${fmt(C.pagado)}. El día ${S.tc.pago} no debes nada.`]);
+  else if(C.estado==='minimo')
+    A.push(['warn',`Tarjeta: mínimo cumplido, sin mora. Quedan ${fmt(C.rotando)} rotando (~${fmt(C.interes)} de interés este mes).`]);
+  else if(C.estado==='pendiente')
+    A.push(['bad',`Tarjeta: llevas ${fmt(C.pagado)} de ${fmt(C.ext)}. Vence en ${C.dias} día${C.dias===1?'':'s'}.`]);
+  else if(S.tc.saldo>0&&dias(S.tc.pago)<=5)
+    A.push(['warn',`La tarjeta vence en ${dias(S.tc.pago)} días con ${fmt(S.tc.saldo)}. Paga el total.`]);
   if(ev&&ev.d<=60&&S.fondo.saldo<ev.c)A.push(['warn',`${ev.n} en ${ev.d} días (~${fmt(ev.c)}) y el fondo tiene ${fmt(S.fondo.saldo)}. Aparta ${fmt(Math.ceil((ev.c-S.fondo.saldo)/Math.max(1,Math.ceil(ev.d/30))))} este mes o vuelves a pedir prestado.`]);
   if(tm&&proy>presT)A.push(['warn',`Proyección ${fmt(proy)} vs presupuesto ${fmt(presT)}.`]);
   if(tm&&evi/tm>0.35)A.push(['warn',`${(evi/tm*100).toFixed(0)}% de tu gasto del mes es evitable.`]);
