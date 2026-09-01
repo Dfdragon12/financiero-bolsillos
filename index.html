@@ -267,6 +267,26 @@ tr:last-child td{border-bottom:0}
       <p class="mini">Límite sano: 30% del cupo = $1.800.000. Mejor día para comprar: el 16 (47 días sin intereses).</p>
     </div>
     <div class="card">
+      <h2>Suscripciones</h2>
+      <div id="sub-pend"></div>
+      <div class="kpi">
+        <div>Al mes<b id="sub-mes">—</b></div>
+        <div>Al año<b id="sub-ano">—</b></div>
+      </div>
+      <div id="sub-list" style="margin-top:12px"></div>
+      <div class="row" style="gap:7px;margin-top:12px">
+        <input id="sb-n" placeholder="nombre" style="flex:2;min-width:120px">
+        <input id="sb-v" inputmode="numeric" placeholder="$0" style="flex:1;min-width:88px;text-align:right">
+      </div>
+      <div class="row" style="gap:7px;margin-top:8px">
+        <input id="sb-d" type="number" min="1" max="31" placeholder="día" style="width:74px">
+        <select id="sb-c" style="flex:1;min-width:110px"></select>
+        <select id="sb-p" style="flex:1;min-width:104px"><option value="B1">Paga B1</option><option value="B2" selected>Paga B2</option></select>
+        <button class="sm" onclick="addSub()">Añadir</button>
+      </div>
+      <p class="mini">Se cobran solas en la tarjeta. Cuando llega el día, la app te avisa y las registra con un toque.</p>
+    </div>
+    <div class="card">
       <h2>Subir extracto</h2>
       <button class="wide" onclick="document.getElementById('extracto').click()">📄 Subir extracto de la tarjeta</button>
       <input type="file" id="extracto" accept="image/*,application/pdf" style="display:none" onchange="procesarExtracto(this)">
@@ -504,7 +524,7 @@ tr:last-child td{border-bottom:0}
 </div>
 
 <script>
-const VERSION='2026.08.28';   // súbela cada vez que edites el archivo
+const VERSION='2026.08.30';   // súbela cada vez que edites el archivo
 const KEY='bolsillos_m2';
 const ING={B1:727041,B2:436225,B3:290086};
 const CATS=[
@@ -540,6 +560,7 @@ function cargar(){
     deuda:{cuota:303297,total:6,pagadas:0},
     fondo:{saldo:0,meta:3019782,aporte:100000},
     fes:{aportes:1613091,prog:709611},
+    subs:[],
     deseos:[], borrados:[], tumbas:[], url:'', apiKey:'', lastQ:null
   },d);
 }
@@ -993,6 +1014,96 @@ function pintarAnalisis(){
   document.getElementById('an-cats').innerHTML=ord.length
     ? '<table>'+ord.map(([c,v])=>`<tr><td>${c}</td><td>${fmt(v)} · ${A.tot?(v/A.tot*100).toFixed(0):0}%</td></tr>`).join('')+'</table>'
     : '<div class="empty">Sin movimientos en este periodo.</div>';
+}
+
+/* ---------- suscripciones ----------
+   Se cobran solas en la tarjeta. La app no puede cobrarlas por su cuenta
+   (solo corre cuando la abres), así que detecta las vencidas y las registra
+   con un toque, siempre con la fecha real del cobro. */
+function addSub(){
+  const n=document.getElementById('sb-n').value.trim();
+  const v=num(document.getElementById('sb-v').value);
+  const d=Math.min(31,Math.max(1,num(document.getElementById('sb-d').value)||1));
+  if(!n||v<=0){alert('Escribe el nombre y el valor.');return}
+  S.subs=S.subs||[];
+  S.subs.push({id:uid(),n,v,d,cat:document.getElementById('sb-c').value,
+    dest:document.getElementById('sb-p').value,activa:1,ultimo:''});
+  document.getElementById('sb-n').value='';document.getElementById('sb-v').value='';
+  document.getElementById('sb-d').value='';
+  guardarLS();
+}
+function delSub(id){
+  if(!confirm('¿Borrar esta suscripción? Los cobros ya registrados se quedan.'))return;
+  S.subs=(S.subs||[]).filter(s=>s.id!==id);guardarLS();
+}
+function pausarSub(id){
+  const s=(S.subs||[]).find(x=>x.id===id);if(!s)return;
+  s.activa=s.activa?0:1;guardarLS();
+}
+/* fecha real del cobro de este mes (si el día no existe, el último del mes) */
+function fechaCobro(sub,y,m){
+  const ult=new Date(y,m+1,0).getDate();
+  return ds(new Date(y,m,Math.min(sub.d,ult)));
+}
+function subsPendientes(){
+  const n=new Date(), y=n.getFullYear(), m=n.getMonth(), hoyS=hoy();
+  return (S.subs||[]).filter(s=>{
+    if(!s.activa)return false;
+    if(s.ultimo===mes())return false;              // ya se registró este mes
+    return fechaCobro(s,y,m)<=hoyS;                // ya pasó el día del cobro
+  });
+}
+function cobrarSub(id){
+  const s=(S.subs||[]).find(x=>x.id===id);if(!s)return;
+  const n=new Date();
+  const f=fechaCobro(s,n.getFullYear(),n.getMonth());
+  S.movs.push({id:uid(),f,ts:new Date().toISOString(),cat:s.cat,val:s.v,src:'TC',
+    nec:cinfo(s.cat)[2],nota:s.n+' · suscripción',tipo:'gasto',dest:s.dest,sync:0});
+  S.tc.saldo+=s.v;s.ultimo=mes();
+  guardarLS();sync();
+}
+function cobrarTodas(){
+  const p=subsPendientes();
+  if(!p.length)return;
+  const t=p.reduce((a,s)=>a+s.v,0);
+  if(!confirm('Registrar '+p.length+' cobro(s) por '+fmt(t)+' en la tarjeta?'))return;
+  p.forEach(s=>cobrarSub(s.id));
+  if(navigator.vibrate)navigator.vibrate([12,40,12]);
+}
+function pintarSubs(){
+  const L=(S.subs||[]).slice().sort((a,b)=>a.d-b.d);
+  const act=L.filter(s=>s.activa);
+  const mesT=act.reduce((a,s)=>a+s.v,0);
+  document.getElementById('sub-mes').textContent=fmt(mesT);
+  document.getElementById('sub-ano').textContent=fmt(mesT*12);
+
+  const P=subsPendientes();
+  document.getElementById('sub-pend').innerHTML=P.length
+    ? `<div class="alert warn"><b>${P.length} cobro(s) ya pasaron y no están registrados:</b> ${
+        P.map(s=>s.n+' '+fmt(s.v)).join(' · ')} = <b>${fmt(P.reduce((a,s)=>a+s.v,0))}</b>
+       <button class="sm" style="margin-top:9px" onclick="cobrarTodas()">Registrar todos</button></div>`
+    : (act.length?'<div class="alert ok" style="margin-bottom:12px">Todos los cobros del mes están registrados.</div>':'');
+
+  if(!L.length){document.getElementById('sub-list').innerHTML=
+    '<div class="empty">Añade Netflix, Spotify, el gym, iCloud… lo que se te cobre solo.</div>';return}
+
+  const hoyD=new Date().getDate();
+  document.getElementById('sub-list').innerHTML=L.map(s=>{
+    const cobrada=s.ultimo===mes();
+    const prox=s.d>=hoyD?s.d+' de este mes':s.d+' del próximo';
+    return `<div class="mv">
+      <div class="ic" style="background:${s.activa?'var(--tc)':'#bbb'};font-size:13px">${s.d}</div>
+      <div class="tx"><div class="t1">${s.n}${s.activa?'':' · pausada'}</div>
+        <div class="t2">${s.cat} · paga B${s.dest.slice(1)} · ${fmt(s.v*12)}/año · ${
+          cobrada?'cobrada este mes':'próximo '+prox}</div></div>
+      <div class="am">${fmt(s.v)}</div>
+      <button class="sm ghost" style="padding:6px 9px" onclick="pausarSub('${s.id}')">${s.activa?'⏸':'▶'}</button>
+      <button class="sm ghost" style="color:var(--bad);padding:6px 9px" onclick="delSub('${s.id}')">✕</button>
+    </div>`}).join('')
+    +(mesT>0?`<div class="alert ${mesT*12>1000000?'bad':'info'}" style="margin-top:12px">
+      ${fmt(mesT)} al mes son <b>${fmt(mesT*12)} al año</b>${
+        mesT*12>0?`, equivalente a ${(mesT*12/1453583).toFixed(1)} quincenas completas de tu sueldo`:''}.
+      ${act.filter(s=>cinfo(s.cat)[2]==='evi').length?`De eso, ${fmt(act.filter(s=>cinfo(s.cat)[2]==='evi').reduce((a,s)=>a+s.v,0)*12)}/año es evitable.`:''}</div>`:'');
 }
 
 /* ---------- patrimonio ---------- */
@@ -1722,6 +1833,7 @@ function pintar(){
     ?`<b>${ev.n}</b> en ${ev.d} días (~${fmt(ev.c)}). Tienes ${fmt(F.saldo)}. ${F.saldo>=ev.c?'Cubierto.':'Te faltan '+fmt(ev.c-F.saldo)+' — son '+fmt((ev.c-F.saldo)/Math.max(1,Math.ceil(ev.d/30)))+' al mes.'}`
     :'';
 
+  pintarSubs();
   document.getElementById('fa').value=fmt((S.fes||{}).aportes||0);
   document.getElementById('fp').value=fmt((S.fes||{}).prog||0);
   pintarUltimo();pintarAnalisis();pintarPatrimonio();pintarDeseos();
@@ -1756,6 +1868,8 @@ function alertas(tm,evi,proy,presT,libre,comp,dq){
   document.getElementById('alerts').innerHTML=A.map(a=>`<div class="alert ${a[0]}">${a[1]}</div>`).join('');
 }
 
+document.getElementById('sb-c').innerHTML=CATS.map(c=>
+  `<option ${c[0]==='Ocio'?'selected':''}>${c[0]}</option>`).join('');
 chips();desdeAtajo();pintar();
 setTimeout(()=>sync(),900);
 setTimeout(()=>fusionar(),2600);
