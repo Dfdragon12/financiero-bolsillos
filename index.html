@@ -372,9 +372,12 @@ tr:last-child td{border-bottom:0}
         <div>Termina<b id="d-fin">—</b></div>
       </div>
       <div class="bar" style="margin-top:12px"><i id="dbar"></i></div>
-      <div class="row" style="margin-top:13px">
+      <div id="d-est" style="margin-top:12px"></div>
+      <div class="row" style="align-items:center">
         <button class="sm" onclick="pagarCuota()">Registrar cuota</button>
         <button class="sm ghost" onclick="undoCuota()">Deshacer</button>
+        <span class="mini" style="margin:0">Vence el día</span>
+        <input id="d-dia" type="number" min="1" max="31" style="width:62px;padding:7px" onchange="S.deuda.dia=Math.min(31,Math.max(1,num(this.value)||5));guardarLS()">
       </div>
     </div>
     <div class="card">
@@ -534,7 +537,7 @@ tr:last-child td{border-bottom:0}
 </div>
 
 <script>
-const VERSION='2026.09.01';   // súbela cada vez que edites el archivo
+const VERSION='2026.09.01b';   // súbela cada vez que edites el archivo
 const KEY='bolsillos_m2';
 const ING={B1:727041,B2:436225,B3:290086};
 const CATS=[
@@ -567,7 +570,7 @@ function cargar(){
     saldos:{B1:439769,B2:310909,B3:3560158},
     movs:[],
     tc:{cupo:6000000,saldo:823837,corte:15,pago:2,extracto:0,minimo:0},
-    deuda:{cuota:303297,total:6,pagadas:0},
+    deuda:{cuota:303297,total:6,pagadas:0,desde:'2026-08',dia:5},
     fondo:{saldo:0,meta:3019782,aporte:100000},
     fes:{aportes:1613091,prog:709611},
     subs:[],
@@ -1190,7 +1193,7 @@ function bloqueos(){
   if(ev&&ev.d<=90&&S.fondo.saldo<ev.c)
     b.push([ev.n+' en '+ev.d+' días',`El fondo tiene ${fmt(S.fondo.saldo)} de ${fmt(ev.c)}. Esto es lo que te llevó a pedirle prestado a tu suegra.`]);
   if(S.deuda.pagadas<S.deuda.total)
-    b.push([`Debes ${S.deuda.total-S.deuda.pagadas} cuotas a tu suegra`,`${fmt((S.deuda.total-S.deuda.pagadas)*S.deuda.cuota)} pendientes. Se liberan $303.297/mes al terminar.`]);
+    b.push([`Debes ${S.deuda.total-S.deuda.pagadas} cuotas a tu suegra`,`${fmt((S.deuda.total-S.deuda.pagadas)*S.deuda.cuota)} pendientes hasta ${nombreMes(mesCuota(S.deuda.total-1))}. Ahí se liberan ${fmt(S.deuda.cuota)}/mes.`]);
   const colchon=S.saldos.B3+((S.fes||{}).prog||0);
   if(colchon<ESENCIAL*3)b.push(['Colchón bajo 3 meses',`Tienes ${fmt(colchon)} disponible = ${(colchon/ESENCIAL).toFixed(1)} meses de gastos esenciales. Repón antes de gastar por gusto.`]);
   if(S.saldos.B1<0||S.saldos.B2<0)b.push(['Bolsillo en sobregiro','Sal del rojo primero.']);
@@ -1569,12 +1572,45 @@ function aplicarPago(partes){
     .forEach(m=>{if(rest>=m.val){m.pagadoTC=1;rest-=m.val}});
   document.getElementById('tcm').value='';guardarLS();sync();
 }
+/* ---------- cuotas por mes cubierto, no por fecha de pago ----------
+   Si pagas la cuota de septiembre el 30 de agosto, esa cuota queda cubierta
+   y no debe volver a aparecer como pendiente en septiembre. */
+const idxMes=ym=>{const p=String(ym).split('-');return (+p[0])*12+(+p[1]-1)};
+function mesCuota(i){
+  const b=idxMes(S.deuda.desde||'2026-08')+i;
+  return Math.floor(b/12)+'-'+String(b%12+1).padStart(2,'0');
+}
+function nombreMes(ym){
+  const p=ym.split('-');
+  return new Date(+p[0],+p[1]-1,1).toLocaleDateString('es-CO',{month:'long',year:'numeric'});
+}
+function fechaCuota(i){
+  const p=mesCuota(i).split('-'), y=+p[0], m=+p[1];
+  const ult=new Date(y,m,0).getDate();
+  return new Date(y,m-1,Math.min(S.deuda.dia||5,ult));
+}
+/* ¿la cuota que toca ya está cubierta? */
+function cuotaEstado(){
+  const D=S.deuda;
+  if(D.pagadas>=D.total)return {libre:true};
+  const i=D.pagadas;                      // índice de la próxima cuota sin pagar
+  const cubre=mesCuota(i);
+  const f=fechaCuota(i);
+  const n=new Date();n.setHours(0,0,0,0);
+  const d=Math.round((f-n)/86400000);
+  return {libre:false,i,cubre,fecha:f,dias:d,
+          adelantada:idxMes(cubre)>idxMes(mes()),   // ya cubriste este mes y vas por el siguiente
+          vencida:d<0};
+}
 function pagarCuota(){
-  if(S.deuda.pagadas>=S.deuda.total){alert('Ya pagaste las 6. Libre.');return}
-  const c=S.deuda.cuota;
-  S.movs.push({id:uid(),f:hoy(),ts:new Date().toISOString(),cat:'Deuda',val:c,src:'B2',nec:'nec',
-    nota:'Préstamo suegra '+(S.deuda.pagadas+1)+'/'+S.deuda.total,tipo:'gasto',sync:0});
-  S.saldos.B2-=c;S.deuda.pagadas++;guardarLS();sync();
+  const D=S.deuda;
+  if(D.pagadas>=D.total){alert('Ya pagaste las '+D.total+'. Libre.');return}
+  const i=D.pagadas, cubre=mesCuota(i);
+  if(!confirm('Registrar la cuota '+(i+1)+' de '+D.total+' ('+fmt(D.cuota)+
+     '), que cubre '+nombreMes(cubre)+'.\n\nSe descuenta de Bolsillo 2 con fecha de hoy.'))return;
+  S.movs.push({id:uid(),f:hoy(),ts:new Date().toISOString(),cat:'Deuda',val:D.cuota,src:'B2',nec:'nec',
+    nota:'Préstamo suegra '+(i+1)+'/'+D.total+' · cubre '+cubre,tipo:'gasto',sync:0});
+  S.saldos.B2-=D.cuota;D.pagadas++;guardarLS();sync();
 }
 function undoCuota(){
   if(S.deuda.pagadas<=0){alert('No hay cuotas registradas.');return}
@@ -1782,7 +1818,9 @@ function calendario(){
     add(dias(S.tc.pago),'Vence pago tarjeta',`Faltan ${fmt(CC.falta)} para el mínimo`,'−'+fmt(CC.ext-CC.pagado));
   else if(S.tc.saldo>0)
     add(dias(S.tc.pago),'Vence pago tarjeta','Paga el total, nunca el mínimo','−'+fmt(S.tc.saldo));
-  if(S.deuda.pagadas<S.deuda.total)add(dias(5),'Cuota suegra','Cuota '+(S.deuda.pagadas+1)+' de '+S.deuda.total,'−'+fmt(S.deuda.cuota));
+  const CU=cuotaEstado();
+  if(!CU.libre&&!CU.adelantada)
+    add(CU.dias,'Cuota suegra','Cuota '+(CU.i+1)+' de '+S.deuda.total+' · cubre '+nombreMes(CU.cubre),'−'+fmt(S.deuda.cuota));
   const pe=proximoEvento();
   if(pe)add(pe.d,pe.n,'Cubre con el fondo de fechas especiales','~'+fmt(pe.c));
   ev.sort((a,b)=>a.d-b.d);
@@ -1814,7 +1852,9 @@ function pintar(){
 
   /* HERO — el número que decide el comportamiento */
   const dq=diasQuincena();
-  const cuotaPend=(S.deuda.pagadas<S.deuda.total&&!S.movs.some(m=>m.f.slice(0,7)===mes()&&(m.nota||'').indexOf('Préstamo suegra')===0))?S.deuda.cuota:0;
+  const CU=cuotaEstado();
+  /* solo pesa si la cuota que cubre este mes todavía no se ha pagado */
+  const cuotaPend=(!CU.libre&&!CU.adelantada)?S.deuda.cuota:0;
   const comp=S.tc.saldo+cuotaPend;
   const libre=s.B1+s.B2-comp;
   const porDia=libre>0?libre/Math.max(1,dq):0;
@@ -1893,10 +1933,18 @@ function pintar(){
   document.getElementById('d-c').textContent=fmt(D.cuota);
   document.getElementById('d-p').textContent=D.pagadas+'/'+D.total;
   document.getElementById('d-pe').textContent=fmt(pe2);
-  const fin=new Date(2026,7+(D.total-D.pagadas),1);
+  document.getElementById('d-dia').value=D.dia||5;
   document.getElementById('d-fin').textContent=D.pagadas>=D.total?'listo'
-    :fin.toLocaleDateString('es-CO',{month:'short',year:'numeric'});
+    :nombreMes(mesCuota(D.total-1)).replace(' de ',' ');
   document.getElementById('dbar').style.width=(D.pagadas/D.total*100)+'%';
+  const CUx=cuotaEstado();
+  document.getElementById('d-est').innerHTML=CUx.libre
+    ? '<div class="alert ok">Deuda saldada. Esos '+fmt(D.cuota)+'/mes ya son tuyos.</div>'
+    : CUx.adelantada
+      ? `<div class="alert ok"><b>Vas adelantado.</b> ${nombreMes(mes())} ya está cubierto. La próxima cuota es la de <b>${nombreMes(CUx.cubre)}</b>, en ${CUx.dias} días.</div>`
+      : CUx.vencida
+        ? `<div class="alert bad"><b>Cuota vencida.</b> La de ${nombreMes(CUx.cubre)} se venció hace ${-CUx.dias} días. Es deuda con la familia de tu novia: págala hoy.</div>`
+        : `<div class="alert warn">Falta la cuota de <b>${nombreMes(CUx.cubre)}</b>: ${fmt(D.cuota)} en ${CUx.dias} día${CUx.dias===1?'':'s'}.</div>`;
 
   const F=S.fondo,ev=proximoEvento();
   document.getElementById('fe-s').textContent=fmt(F.saldo);
