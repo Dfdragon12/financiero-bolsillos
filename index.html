@@ -381,6 +381,29 @@ tr:last-child td{border-bottom:0}
       </div>
     </div>
     <div class="card">
+      <h2>Welli · crédito con intereses</h2>
+      <div class="kpi">
+        <div>Cuota<b id="w-c">—</b></div>
+        <div>Pagadas<b id="w-p">—</b></div>
+        <div>Saldo capital<b id="w-s">—</b></div>
+        <div>Termina<b id="w-fin">—</b></div>
+      </div>
+      <div class="bar" style="margin-top:12px"><i id="wbar"></i></div>
+      <div id="w-est" style="margin-top:12px"></div>
+      <div class="row" style="align-items:center">
+        <button class="sm" onclick="pagarWelli()">Registrar cuota</button>
+        <button class="sm ghost" onclick="undoWelli()">Deshacer</button>
+        <span class="mini" style="margin:0">Paga</span>
+        <select id="w-src" style="width:auto;padding:7px" onchange="S.welli.src=this.value;guardarLS()">
+          <option value="B1">B1</option><option value="B2">B2</option><option value="B3">B3</option></select>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <input id="w-ab" type="text" inputmode="numeric" style="flex:1;min-width:110px" placeholder="$1.000.000">
+        <button class="sm" onclick="abonoWelli()">Abono a capital</button>
+      </div>
+      <p class="mini" id="w-txt"></p>
+    </div>
+    <div class="card">
       <h2>ICETEX · 14,56% E.A.</h2>
       <table>
         <tr><td>Capital vigente</td><td>$131.467.368</td></tr>
@@ -390,7 +413,7 @@ tr:last-child td{border-bottom:0}
         <tr><td>Plazo restante</td><td>14,3 años</td></tr>
         <tr><td>Intereses totales</td><td class="neg">$168.916.083</td></tr>
       </table>
-      <p class="mini">86% de cada cuota es interés. La paga tu papá. Cualquier abono debe pedirse como <b>"abono a capital con reducción de plazo"</b>.</p>
+      <p class="mini">86% de cada cuota es interés. La paga tu papá, pero <b>el crédito está a tu nombre</b>: si un mes no se paga, la mora y el reporte son tuyos. Cualquier abono debe pedirse como <b>"abono a capital con reducción de plazo"</b>.</p>
     </div>
     <div class="card">
       <h2>Simulador de abono</h2>
@@ -425,6 +448,23 @@ tr:last-child td{border-bottom:0}
       <p class="mini">Los aportes solo te los devuelven al retirarte del fondo. El ahorro programado sí puedes moverlo. Si tengo los dos al revés, cámbialos aquí.</p>
     </div>
     <div class="card">
+      <h2>Welli</h2>
+      <div class="f"><label>Cuota total mensual</label><input id="wc" type="text" inputmode="numeric" onchange="setWelli()"></div>
+      <div class="f"><label>Seguro + fianza + IVA (va en la cuota, no baja capital)</label><input id="wf" type="text" inputmode="numeric" onchange="setWelli()"></div>
+      <div class="f"><label>Saldo de capital</label><input id="ws" type="text" inputmode="numeric" onchange="setWelli()"></div>
+      <div class="f"><label>Tasa E.A. (%)</label><input id="wt" type="text" inputmode="decimal" onchange="setWelli()"></div>
+      <div class="f"><label>Primera cuota (mes) y día de pago</label>
+        <div class="row" style="gap:7px"><input id="wd" type="month" style="flex:1" onchange="setWelli()">
+        <input id="wdd" type="number" min="1" max="31" style="width:70px" onchange="setWelli()"></div></div>
+      <p class="mini">Cópialos del extracto de Welli cuando cambien. Los montos viven en este teléfono y en tu hoja, no en GitHub (el repo es público).</p>
+    </div>
+    <div class="card">
+      <h2>Otras cuentas</h2>
+      <div class="f"><label>ARQ (USD)</label><input id="xu" type="text" inputmode="decimal" onchange="setOtras()"></div>
+      <div class="f"><label>TRM (pesos por dólar)</label><input id="xt" type="text" inputmode="numeric" onchange="setOtras()"></div>
+      <div class="f"><label>Nequi</label><input id="xn" type="text" inputmode="numeric" onchange="setOtras()"></div>
+    </div>
+    <div class="card">
       <h2>Lectura de facturas</h2>
       <div class="f"><label>API key de Claude</label>
         <input id="ck" type="password" placeholder="sk-ant-..." onchange="setKey()"></div>
@@ -433,6 +473,7 @@ tr:last-child td{border-bottom:0}
     <div class="card">
       <h2>Sincronización con Google Sheets</h2>
       <div class="f"><label>URL del Apps Script</label><input id="cu" type="url" placeholder="https://script.google.com/macros/s/.../exec" onchange="setURL()"></div>
+      <div class="f"><label>Token del Apps Script (opcional)</label><input id="ctk" type="password" placeholder="solo si tu Apps Script lo pide" onchange="setToken()"></div>
       <div class="row">
         <button class="sm" onclick="sync(true)">Sincronizar ahora</button>
         <button class="sm ghost" onclick="fusionar(true)">Traer gastos del Atajo</button>
@@ -531,13 +572,14 @@ tr:last-child td{border-bottom:0}
     <button class="wide" onclick="guardar()">Guardar gasto</button>
     <div class="row" style="margin-top:9px">
       <button class="ghost sm" style="flex:1" onclick="guardar(true)">Es un ingreso</button>
+      <button class="ghost sm" style="flex:1" onclick="guardar('reintegro')">Es un reintegro</button>
       <button class="ghost sm" style="flex:1" onclick="closeAdd()">Cancelar</button>
     </div>
   </div>
 </div>
 
 <script>
-const VERSION='2026.09.01b';   // súbela cada vez que edites el archivo
+const VERSION='2026.11.17';   // súbela cada vez que edites el archivo
 const KEY='bolsillos_m2';
 const ING={B1:727041,B2:436225,B3:290086};
 const CATS=[
@@ -573,10 +615,22 @@ function cargar(){
     deuda:{cuota:303297,total:6,pagadas:0,desde:'2026-08',dia:5},
     fondo:{saldo:0,meta:3019782,aporte:100000},
     fes:{aportes:1613091,prog:709611},
+    /* Welli: montos en blanco a propósito (el repo es público). Se llenan en Ajustes. */
+    welli:{cuota:0,fijo:0,saldo:0,tasa:0,total:0,pagadas:0,desde:'',dia:5,src:'B3',hist:[]},
+    otras:{usd:0,trm:0,nequi:0},
     subs:[],
-    deseos:[], borrados:[], tumbas:[], url:'', apiKey:'', lastQ:null
+    deseos:[], borrados:[], tumbas:[], url:'', apiKey:'', token:'', lastQ:null
   },d);
 }
+/* ---------- Welli: cuota fija con seguro y fianza que no bajan capital ---------- */
+const wMes=W=>Math.pow(1+(W.tasa||0),1/12)-1;          // tasa efectiva mensual
+function wRestantes(W){                                   // cuotas que faltan con el saldo actual
+  if(W.saldo<=0)return 0;
+  const n=plazo(W.saldo,Math.max(1,W.cuota-W.fijo),wMes(W));
+  return isFinite(n)?Math.ceil(n-1e-6):999;
+}
+function wRecalc(){const W=S.welli;W.total=W.pagadas+wRestantes(W)}
+function wActivo(){const W=S.welli;return W.cuota>0&&W.saldo>0&&!!W.desde}
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function guardarLS(){persist();pintar()}
 /* si el movimiento ya viajó a la hoja, hay que borrarlo también allá */
@@ -982,13 +1036,14 @@ function analizar(r){
   const gastos=en.filter(m=>m.tipo==='gasto');
   const salida=en.filter(m=>(m.tipo==='gasto'&&m.src!=='TC')||m.tipo==='pagoTC')
                  .reduce((a,m)=>a+m.val,0);
-  const ingresoExtra=en.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+m.val,0);
+  const ingresoExtra=en.filter(m=>m.tipo==='ingreso'&&m.cat!=='Reintegro').reduce((a,m)=>a+m.val,0);
+  const reint=en.filter(m=>m.tipo==='ingreso'&&m.cat==='Reintegro').reduce((a,m)=>a+m.val,0);
   const quincenas=PER==='mes'?2:1;
   const entrada=(ING.B1+ING.B2)*quincenas+ingresoExtra;
   const tot=gastos.reduce((a,m)=>a+m.val,0);
   const evi=gastos.filter(m=>m.nec==='evi').reduce((a,m)=>a+m.val,0);
   const porCat={};gastos.forEach(m=>porCat[m.cat]=(porCat[m.cat]||0)+m.val);
-  return {entrada,salida,sup:entrada-salida,tot,evi,nec:tot-evi,n:gastos.length,porCat,
+  return {entrada,salida,sup:entrada-salida,tot,evi,nec:tot-evi,n:gastos.length,porCat,reint,
           conTC:gastos.filter(m=>m.src==='TC').reduce((a,m)=>a+m.val,0)};
 }
 
@@ -1020,6 +1075,7 @@ function pintarAnalisis(){
       cmp=`<div class="alert ${d>0?'warn':'ok'}">Gastaste ${fmt(Math.abs(d))} ${d>0?'más':'menos'} que la quincena anterior (${p}%). Antes ${fmt(prev.tot)}, ahora ${fmt(A.tot)}.</div>`;
     }
   }
+  if(A.reint>0)cmp+=`<div class="alert info">Además entraron ${fmt(A.reint)} de reintegros (deudas que te pagaron o plata de tu propio ahorro). No los cuento como ingreso: si los gastas, el mes se ve mejor de lo que fue.</div>`;
   if(A.conTC>0)cmp+=`<div class="alert info">${fmt(A.conTC)} de esos gastos fueron con tarjeta: aún no salieron de tus bolsillos, pero ya están comprometidos.</div>`;
   document.getElementById('an-cmp').innerHTML=cmp;
 
@@ -1134,8 +1190,13 @@ function pintarPatrimonio(){
     ['FESERACIS · programado',F.prog,'disponible','3,4%'],
     ['FESERACIS · aportes',F.aportes,'bloqueado','3,4%']
   ];
+  const O=S.otras||{};
+  if(O.usd)filas.push(['ARQ · '+O.usd.toLocaleString('es-CO')+' USD',O.trm?O.usd*O.trm:0,
+    O.trm?'TRM '+fmt(O.trm):'pon la TRM en Ajustes','']);
+  if(O.nequi)filas.push(['Nequi',O.nequi,'disponible','']);
+  const W=S.welli;
   const liq=filas.reduce((a,f)=>a+f[1],0);
-  const deudas=S.tc.saldo+(S.deuda.total-S.deuda.pagadas)*S.deuda.cuota;
+  const deudas=S.tc.saldo+(S.deuda.total-S.deuda.pagadas)*S.deuda.cuota+(wActivo()?W.saldo:0);
   const colchon=S.saldos.B3+F.prog;                 // solo lo que puedes tocar de verdad
   const rend=S.saldos.B3*TASAS.nu+(F.prog+F.aportes)*TASAS.fes;
   document.getElementById('pat-t').innerHTML=filas.map(f=>
@@ -1153,6 +1214,12 @@ function pintarPatrimonio(){
     av.push(['warn',`FESERACIS te da 3,4% con inflación de 5,2%: pierdes ${fmt(Math.abs((F.prog+F.aportes)*realFes))} de poder adquisitivo al año. Los aportes están bloqueados, pero el programado (${fmt(F.prog)}) sí lo puedes mover.`]);
   if(F.prog>0)
     av.push(['info',`Mover el ahorro programado a Nu te daría ${fmt(F.prog*(TASAS.nu-TASAS.fes))} más al año. Abonarlo al ICETEX, ${fmt(F.prog*(TASAS.ice-TASAS.fes))}.`]);
+  if(wActivo()&&W.tasa>TASAS.nu){
+    const sobra=Math.max(0,Math.min(W.saldo,colchon-ESENCIAL*3));
+    av.push([sobra>0?'warn':'info',`Welli te cuesta ${(W.tasa*100).toFixed(1).replace('.',',')}% E.A. (más seguro y fianza) y B3 rinde ${(TASAS.nu*100).toFixed(1).replace('.',',')}%. `+
+      (sobra>0?`Puedes abonar hasta ${fmt(sobra)} sin bajar de 3 meses de colchón.`:'Tu colchón no da para abonar todavía sin quedar expuesto.')]);
+  }
+  av.push(['info',`ICETEX (${fmt(ICE.cap)}) está a tu nombre aunque lo pague tu papá. No lo sumo al neto, pero si un mes no se paga, la cuota de ${fmt(ICE.cuota)} es tuya.`]);
   if(colchon/ESENCIAL<3)
     av.push(['bad',`Tu colchón real cubre ${(colchon/ESENCIAL).toFixed(1)} meses de gastos esenciales. Por debajo de 3 estás expuesto.`]);
   else
@@ -1194,6 +1261,8 @@ function bloqueos(){
     b.push([ev.n+' en '+ev.d+' días',`El fondo tiene ${fmt(S.fondo.saldo)} de ${fmt(ev.c)}. Esto es lo que te llevó a pedirle prestado a tu suegra.`]);
   if(S.deuda.pagadas<S.deuda.total)
     b.push([`Debes ${S.deuda.total-S.deuda.pagadas} cuotas a tu suegra`,`${fmt((S.deuda.total-S.deuda.pagadas)*S.deuda.cuota)} pendientes hasta ${nombreMes(mesCuota(S.deuda.total-1))}. Ahí se liberan ${fmt(S.deuda.cuota)}/mes.`]);
+  if(wActivo())
+    b.push([`Welli: ${fmt(S.welli.saldo)} de capital`,`Te cuesta ${(S.welli.tasa*100).toFixed(1).replace('.',',')}% E.A. Cada peso que vaya a un gusto en vez de a esta deuda sale caro.`]);
   const colchon=S.saldos.B3+((S.fes||{}).prog||0);
   if(colchon<ESENCIAL*3)b.push(['Colchón bajo 3 meses',`Tienes ${fmt(colchon)} disponible = ${(colchon/ESENCIAL).toFixed(1)} meses de gastos esenciales. Repón antes de gastar por gusto.`]);
   if(S.saldos.B1<0||S.saldos.B2<0)b.push(['Bolsillo en sobregiro','Sal del rojo primero.']);
@@ -1349,7 +1418,8 @@ async function pedirOpinion(){
   const ctx=`Diego, 24 años, Bogotá. Neto mensual $2.907.166 con sistema 50/30/20.
 Saldos: B1 (necesidades) ${fmt(S.saldos.B1)}, B2 (gustos) ${fmt(S.saldos.B2)}, B3 (ahorro, intocable) ${fmt(S.saldos.B3)}.
 Tarjeta debe ${fmt(S.tc.saldo)} de $6.000.000 de cupo, vence el día ${S.tc.pago}.
-Debe 6 cuotas de $303.297 a su suegra (lleva ${S.deuda.pagadas}) por un aniversario que financió con deuda.
+Debe ${S.deuda.total} cuotas de ${fmt(S.deuda.cuota)} a su suegra (lleva ${S.deuda.pagadas}) por un aniversario que financió con deuda.${
+wActivo()?`\nTiene un crédito con Welli: ${fmt(S.welli.saldo)} de capital al ${(S.welli.tasa*100).toFixed(1)}% E.A., cuota de ${fmt(S.welli.cuota)} (lleva ${S.welli.pagadas} de ${S.welli.total}).`:''}
 Fondo para fechas especiales: ${fmt(S.fondo.saldo)} de meta $3.019.782.
 Este mes lleva gastados ${fmt(tot)}, de los cuales ${fmt(evi)} son evitables.
 Faltan ${diasQuincena()} días para la quincena.
@@ -1390,7 +1460,9 @@ function guardar(esIngreso){
   const nota=document.getElementById('a-nota').value.trim();
   const fecha=document.getElementById('a-fecha').value||sel.f||hoy();
   let cat=sel.cat, src=sel.src, nec, razon='';
-  if(esIngreso){cat='Ingreso';nec='nec'}
+  /* reintegro = plata que ya era tuya (deudas que te pagan, traslados del fondo de empleados).
+     Suma al bolsillo pero no cuenta como ingreso en el análisis. */
+  if(esIngreso){cat=esIngreso==='reintegro'?'Reintegro':'Ingreso';nec='nec'}
   else if(sel.nec==='auto'){
     const c=clasificar(sel.cat,nota,sel.src);
     cat=c.cat;src=c.src;nec=c.nec;razon=c.razon;
@@ -1576,26 +1648,25 @@ function aplicarPago(partes){
    Si pagas la cuota de septiembre el 30 de agosto, esa cuota queda cubierta
    y no debe volver a aparecer como pendiente en septiembre. */
 const idxMes=ym=>{const p=String(ym).split('-');return (+p[0])*12+(+p[1]-1)};
-function mesCuota(i){
-  const b=idxMes(S.deuda.desde||'2026-08')+i;
+function mesCuota(i,D=S.deuda){
+  const b=idxMes(D.desde||'2026-08')+i;
   return Math.floor(b/12)+'-'+String(b%12+1).padStart(2,'0');
 }
 function nombreMes(ym){
   const p=ym.split('-');
   return new Date(+p[0],+p[1]-1,1).toLocaleDateString('es-CO',{month:'long',year:'numeric'});
 }
-function fechaCuota(i){
-  const p=mesCuota(i).split('-'), y=+p[0], m=+p[1];
+function fechaCuota(i,D=S.deuda){
+  const p=mesCuota(i,D).split('-'), y=+p[0], m=+p[1];
   const ult=new Date(y,m,0).getDate();
-  return new Date(y,m-1,Math.min(S.deuda.dia||5,ult));
+  return new Date(y,m-1,Math.min(D.dia||5,ult));
 }
 /* ¿la cuota que toca ya está cubierta? */
-function cuotaEstado(){
-  const D=S.deuda;
+function cuotaEstado(D=S.deuda){
   if(D.pagadas>=D.total)return {libre:true};
   const i=D.pagadas;                      // índice de la próxima cuota sin pagar
-  const cubre=mesCuota(i);
-  const f=fechaCuota(i);
+  const cubre=mesCuota(i,D);
+  const f=fechaCuota(i,D);
   const n=new Date();n.setHours(0,0,0,0);
   const d=Math.round((f-n)/86400000);
   return {libre:false,i,cubre,fecha:f,dias:d,
@@ -1621,6 +1692,65 @@ function undoCuota(){
   if(i>=0) revertir(i);            // devuelve la plata a B2 y borra el gasto
   S.deuda.pagadas--;
   guardarLS();sync();
+}
+/* "adelantada" solo si ya pagaste la cuota que cubre este mes; una primera cuota futura NO es adelanto */
+function cuotaWelli(){
+  if(!wActivo())return {libre:true};
+  const W=S.welli,c=cuotaEstado(W);
+  if(!c.libre)c.adelantada=W.pagadas>0&&idxMes(mesCuota(W.pagadas-1,W))>=idxMes(mes());
+  return c;
+}
+function pagarWelli(){
+  const W=S.welli;
+  if(!wActivo()){alert('Primero llena los datos de Welli en Ajustes.');return}
+  const i=W.pagadas, cubre=mesCuota(i,W);
+  const interes=Math.round(W.saldo*wMes(W));
+  const capital=Math.max(0,Math.min(W.saldo,W.cuota-W.fijo-interes));
+  if(!confirm('Registrar la cuota '+(i+1)+' de Welli ('+fmt(W.cuota)+'), que cubre '+nombreMes(cubre)+'.\n\n'+
+     'Va a capital ~'+fmt(capital)+'; el resto es interés, seguro y fianza.\nSe descuenta de Bolsillo '+W.src.slice(1)+' con fecha de hoy.'))return;
+  const m={id:uid(),f:hoy(),ts:new Date().toISOString(),cat:'Deuda',val:W.cuota,src:W.src,nec:'nec',
+    nota:'Welli '+(i+1)+' · cubre '+cubre,tipo:'gasto',sync:0};
+  S.movs.push(m);S.saldos[W.src]-=W.cuota;
+  W.hist=(W.hist||[]).concat([{id:m.id,saldo:W.saldo,pagadas:W.pagadas}]).slice(-40);
+  W.saldo-=capital;W.pagadas++;wRecalc();guardarLS();sync();
+}
+function abonoWelli(){
+  const W=S.welli,v=num(document.getElementById('w-ab').value);
+  if(!wActivo()){alert('Primero llena los datos de Welli en Ajustes.');return}
+  if(v<=0){alert('Escribe cuánto vas a abonar.');return}
+  const ab=Math.min(v,W.saldo);
+  const antes=wRestantes(W),despues=wRestantes(Object.assign({},W,{saldo:W.saldo-ab}));
+  if(!confirm('Abono a capital de '+fmt(ab)+' desde Bolsillo '+W.src.slice(1)+'.\n\n'+
+     'Pasas de '+antes+' a '+despues+' cuotas pendientes.\n'+
+     'Pídele a Welli por escrito que sea con REDUCCIÓN DE PLAZO, no de cuota.'))return;
+  const m={id:uid(),f:hoy(),ts:new Date().toISOString(),cat:'Deuda',val:ab,src:W.src,nec:'nec',
+    nota:'Welli abono a capital',tipo:'gasto',sync:0};
+  S.movs.push(m);S.saldos[W.src]-=ab;
+  W.hist=(W.hist||[]).concat([{id:m.id,saldo:W.saldo,pagadas:W.pagadas}]).slice(-40);
+  W.saldo-=ab;wRecalc();document.getElementById('w-ab').value='';guardarLS();sync();
+}
+function undoWelli(){
+  const W=S.welli,h=(W.hist||[]).pop();
+  if(!h){alert('No hay pagos de Welli registrados en este teléfono.');return}
+  const i=S.movs.findIndex(m=>m.id===h.id);
+  if(i>=0)revertir(i);                     // devuelve la plata al bolsillo y borra el gasto
+  W.saldo=h.saldo;W.pagadas=h.pagadas;wRecalc();guardarLS();sync();
+}
+function setWelli(){
+  const W=S.welli;
+  W.cuota=num(document.getElementById('wc').value);
+  W.fijo=num(document.getElementById('wf').value);
+  W.saldo=num(document.getElementById('ws').value);
+  const t=parseFloat(String(document.getElementById('wt').value).replace(',','.'));
+  W.tasa=isNaN(t)?0:t/100;
+  W.desde=document.getElementById('wd').value||'';
+  W.dia=Math.min(31,Math.max(1,num(document.getElementById('wdd').value)||5));
+  wRecalc();guardarLS();sync(true);
+}
+function setOtras(){
+  const u=parseFloat(String(document.getElementById('xu').value).replace(/[^\d,.]/g,'').replace(',','.'));
+  S.otras={usd:isNaN(u)?0:u,trm:num(document.getElementById('xt').value),nequi:num(document.getElementById('xn').value)};
+  guardarLS();
 }
 function aportarFE(){
   const v=num(document.getElementById('fev').value)||S.fondo.aporte;
@@ -1648,6 +1778,7 @@ function setSaldos(){
   S.tc.saldo=num(document.getElementById('ct').value);guardarLS();sync();
 }
 function setURL(){S.url=document.getElementById('cu').value.trim();guardarLS();sync(true)}
+function setToken(){S.token=document.getElementById('ctk').value.trim();persist();sync(true)}
 function setKey(){S.apiKey=document.getElementById('ck').value.trim();persist()}
 /* entrada desde el Atajo de Apple Wallet: index.html?add=5000&cat=Parqueadero&src=B1 */
 function desdeAtajo(){
@@ -1683,6 +1814,7 @@ function jsonp(params,ok,fail){
   const t=setTimeout(()=>{cleanup();fail&&fail('timeout')},14000);
   function cleanup(){clearTimeout(t);delete window[cb];sc.remove()}
   window[cb]=r=>{cleanup();ok&&ok(typeof r==='string'?JSON.parse(r):r)};
+  if(S.token)params=Object.assign({token:S.token},params);
   const qs=Object.entries(params).map(([k,v])=>k+'='+encodeURIComponent(v)).join('&');
   const sc=document.createElement('script');
   sc.src=S.url+'?callback='+cb+'&'+qs;
@@ -1713,7 +1845,9 @@ function sync(manual){
 }
 function pushEstado(){
   jsonp({action:'estado',B1:S.saldos.B1,B2:S.saldos.B2,B3:S.saldos.B3,
-         tcSaldo:S.tc.saldo,deudaPagadas:S.deuda.pagadas,fondo:S.fondo.saldo,lastQ:S.lastQ||''},
+         tcSaldo:S.tc.saldo,deudaPagadas:S.deuda.pagadas,fondo:S.fondo.saldo,lastQ:S.lastQ||'',
+         welliSaldo:S.welli.saldo,welliPagadas:S.welli.pagadas,welliCuota:S.welli.cuota,
+         welliFijo:S.welli.fijo,welliTasa:S.welli.tasa,welliDesde:S.welli.desde,welliDia:S.welli.dia},
     ()=>{estado('ok','al día');pintarPend()},()=>{});
 }
 /* Trae de la hoja los gastos que la app no tiene (los que mandó el Atajo de Wallet).
@@ -1752,7 +1886,11 @@ function bajar(){
     if(r&&r.ok){
       if(r.estado){S.saldos={B1:+r.estado.B1||0,B2:+r.estado.B2||0,B3:+r.estado.B3||0};
         S.tc.saldo=+r.estado.tcSaldo||0;S.deuda.pagadas=+r.estado.deudaPagadas||0;
-        S.fondo.saldo=+r.estado.fondo||0;S.lastQ=r.estado.lastQ||null}
+        S.fondo.saldo=+r.estado.fondo||0;S.lastQ=r.estado.lastQ||null;
+        if(r.estado.welliCuota){const E=r.estado;
+          Object.assign(S.welli,{saldo:+E.welliSaldo||0,pagadas:+E.welliPagadas||0,cuota:+E.welliCuota||0,
+            fijo:+E.welliFijo||0,tasa:+E.welliTasa||0,desde:String(E.welliDesde||'').slice(0,7),dia:+E.welliDia||5,hist:[]});
+          wRecalc()}}
       if(r.movs)S.movs=r.movs.map(m=>Object.assign(m,{sync:1,val:+m.val}));
       guardarLS();estado('ok','al día');alert('Listo: '+(r.movs?r.movs.length:0)+' movimientos.');
     }else estado('err','error');
@@ -1821,6 +1959,9 @@ function calendario(){
   const CU=cuotaEstado();
   if(!CU.libre&&!CU.adelantada)
     add(CU.dias,'Cuota suegra','Cuota '+(CU.i+1)+' de '+S.deuda.total+' · cubre '+nombreMes(CU.cubre),'−'+fmt(S.deuda.cuota));
+  const CW=cuotaWelli();
+  if(!CW.libre&&!CW.adelantada)
+    add(CW.dias,'Cuota Welli','Cuota '+(CW.i+1)+' de '+S.welli.total+' · sale de B'+S.welli.src.slice(1),'−'+fmt(S.welli.cuota));
   const pe=proximoEvento();
   if(pe)add(pe.d,pe.n,'Cubre con el fondo de fechas especiales','~'+fmt(pe.c));
   ev.sort((a,b)=>a.d-b.d);
@@ -1855,7 +1996,11 @@ function pintar(){
   const CU=cuotaEstado();
   /* solo pesa si la cuota que cubre este mes todavía no se ha pagado */
   const cuotaPend=(!CU.libre&&!CU.adelantada)?S.deuda.cuota:0;
-  const comp=S.tc.saldo+cuotaPend;
+  /* Welli solo compromete el efectivo de B1+B2 si se paga desde ahí */
+  const CW=cuotaWelli();
+  const welliPend=(!CW.libre&&!CW.adelantada&&S.welli.src!=='B3'&&CW.dias<=dq)?S.welli.cuota:0;
+  const comp=S.tc.saldo+cuotaPend+welliPend;
+  BUD['Deudas']=(CU.libre?0:S.deuda.cuota)+(CW.libre?0:S.welli.cuota);
   const libre=s.B1+s.B2-comp;
   const porDia=libre>0?libre/Math.max(1,dq):0;
   const hv=document.getElementById('h-dia');
@@ -1955,6 +2100,35 @@ function pintar(){
   document.getElementById('fe-txt').innerHTML=ev
     ?`<b>${ev.n}</b> en ${ev.d} días (~${fmt(ev.c)}). Tienes ${fmt(F.saldo)}. ${F.saldo>=ev.c?'Cubierto.':'Te faltan '+fmt(ev.c-F.saldo)+' — son '+fmt((ev.c-F.saldo)/Math.max(1,Math.ceil(ev.d/30)))+' al mes.'}`
     :'';
+
+  const W=S.welli,CWx=cuotaWelli(),act=wActivo();
+  document.getElementById('w-c').textContent=act?fmt(W.cuota):'—';
+  document.getElementById('w-p').textContent=act?W.pagadas+'/'+W.total:'—';
+  document.getElementById('w-s').textContent=W.saldo>0?fmt(W.saldo):(W.cuota?'$0':'—');
+  document.getElementById('w-fin').textContent=!act?(W.cuota&&W.saldo<=0?'listo':'—')
+    :nombreMes(mesCuota(W.total-1,W)).replace(' de ',' ');
+  document.getElementById('wbar').style.width=(act&&W.total?W.pagadas/W.total*100:0)+'%';
+  document.getElementById('w-src').value=W.src||'B3';
+  document.getElementById('w-est').innerHTML=!W.cuota
+    ? '<div class="alert info">Llena los datos de Welli en Ajustes para seguir la deuda.</div>'
+    : !act ? '<div class="alert ok">Welli saldado.</div>'
+    : CWx.adelantada
+      ? `<div class="alert ok"><b>Vas adelantado.</b> La próxima cuota es la de <b>${nombreMes(CWx.cubre)}</b>, en ${CWx.dias} días.</div>`
+      : CWx.vencida
+        ? `<div class="alert bad"><b>Cuota vencida.</b> La de ${nombreMes(CWx.cubre)} se venció hace ${-CWx.dias} días. La mora es a la tasa máxima legal.</div>`
+        : `<div class="alert warn">Cuota de <b>${nombreMes(CWx.cubre)}</b>: ${fmt(W.cuota)} en ${CWx.dias} día${CWx.dias===1?'':'s'}, desde B${W.src.slice(1)}.</div>`;
+  const resto=act?(W.total-W.pagadas)*W.cuota:0;
+  document.getElementById('w-txt').innerHTML=act
+    ?`Te faltan ~${fmt(resto)} en cuotas por ${fmt(W.saldo)} de capital: ${fmt(Math.max(0,resto-W.saldo))} se van en interés, seguro y fianza. Abonar es sin penalidad.`:'';
+  document.getElementById('wc').value=fmt(W.cuota);document.getElementById('wf').value=fmt(W.fijo);
+  document.getElementById('ws').value=fmt(W.saldo);
+  document.getElementById('wt').value=W.tasa?String(+(W.tasa*100).toFixed(2)).replace('.',','):'';
+  document.getElementById('wd').value=W.desde||'';document.getElementById('wdd').value=W.dia||5;
+  const O=S.otras||{};
+  document.getElementById('xu').value=O.usd?String(O.usd).replace('.',','):'';
+  document.getElementById('xt').value=O.trm?fmt(O.trm):'';
+  document.getElementById('xn').value=O.nequi?fmt(O.nequi):'';
+  document.getElementById('ctk').value=S.token||'';
 
   pintarSubs();
   document.getElementById('fa').value=fmt((S.fes||{}).aportes||0);
