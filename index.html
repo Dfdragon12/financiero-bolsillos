@@ -1862,9 +1862,11 @@ function fusionar(avisar){
     r.movs.forEach(m=>{
       const id=String(m.id),v=Math.round(+m.val||0);
       if(!id||tengo.has(id)||fuera.has(id)||v<=0)return;
-      const cat=cinfo(m.cat)[0]===m.cat?m.cat:'Compras';
-      const src=['B1','B2','TC'].indexOf(m.src)>=0?m.src:'B1';
       const tipo=m.tipo||'gasto';
+      /* ingresos y reintegros no están en CATS: sin esto llegaban como "Compras" */
+      const cat=tipo==='ingreso'?(m.cat==='Reintegro'?'Reintegro':'Ingreso')
+               :(cinfo(m.cat)[0]===m.cat?m.cat:'Compras');
+      const src=['B1','B2','TC'].indexOf(m.src)>=0?m.src:'B1';
       if(tipo==='ingreso')S.saldos[src]+=v;
       else if(tipo==='pagoTC'){S.saldos[src]-=v;S.tc.saldo=Math.max(0,S.tc.saldo-v)}
       else if(src==='TC')S.tc.saldo+=v;
